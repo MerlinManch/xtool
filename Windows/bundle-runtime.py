@@ -122,7 +122,8 @@ def bundle(root):
 
 
 def smoke(root):
-    environment = os.environ.copy()
+    # os.environ is case-insensitive on Windows, an ordinary copied dict is not.
+    environment = {key.upper(): value for key, value in os.environ.items()}
     environment['PATH'] = str(Path(environment['SystemRoot']) / 'System32')
     for name in list(environment):
         if name.upper().startswith(('SWIFT', 'SDKROOT', 'DEVELOPER_DIR')):
