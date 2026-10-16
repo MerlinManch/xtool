@@ -41,6 +41,9 @@ jobs:
         with:
           swift-version: swift-6.4.1-release
           swift-build: 6.4.1-RELEASE
+      - name: Verify native Swift file handles, NTFS hardlinks and SDK directory links
+        shell: pwsh
+        run: ./Windows/test-file-operations.ps1
       - name: Verify CLI commands, project creation and complete synthetic SDK lifecycle
         shell: pwsh
         run: |

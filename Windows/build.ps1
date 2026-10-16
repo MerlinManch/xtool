@@ -151,6 +151,7 @@ try {
         $env:XTOOL_NATIVE_BIN = $dist
         $cliTestFailure = $null
         try {
+            & (Join-Path $PSScriptRoot 'test-file-operations.ps1')
             Invoke-Checked (Join-Path $dist 'xtool.exe') @('--version')
             foreach ($command in @('', 'setup', 'auth', 'sdk', 'new', 'dev', 'ds', 'devices', 'install', 'uninstall', 'launch')) {
                 $helpArgs = @('--help')
