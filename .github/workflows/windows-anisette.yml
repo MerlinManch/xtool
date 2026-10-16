@@ -1,7 +1,7 @@
 name: Native Windows Anisette
 on:
   push:
-    paths: ['Windows/build-anisette.ps1', 'Windows/patches/xadi.patch', '.github/workflows/windows-anisette.yml']
+    paths: ['Windows/build-anisette.ps1', 'Windows/patches/xadi.patch', 'Windows/anisette-tests/**', '.github/workflows/windows-anisette.yml']
   workflow_dispatch:
 concurrency:
   group: windows-anisette-${{ github.ref }}
@@ -17,6 +17,12 @@ jobs:
       - name: Build local Anisette runtime
         shell: pwsh
         run: ./Windows/build-anisette.ps1
+      - name: Test local Anisette DLL and Apple library initialization
+        shell: pwsh
+        run: |
+          $env:XTOOL_ANISETTE_DLL = "$pwd/Windows/dist/bin/XADIBinary.dll"
+          $env:XTOOL_TEST_APPLE_LIBRARIES = '1'
+          python -m unittest discover -s Windows/anisette-tests -p test_anisette_runtime.py -v
       - uses: actions/upload-artifact@v4
         with:
           name: xtool-windows-anisette-x64
