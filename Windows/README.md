@@ -108,6 +108,8 @@ Verified so far:
   protocol-EOF verification.
   Real Windows integration produces an arm64 iOS Mach-O dylib, an Apple static
   archive and Mach-O DWARF debug symbols, including the linker's `-r` routing.
+  The macro server also passes a real compiler-protocol handshake, module loading,
+  SwiftUI `@Entry` expansion with Unicode content and unknown-module diagnostics.
 - The complete CLI compiles and links on native Windows with Swift optimization
   disabled for diagnostics. The optimized release build and complete runtime
   test suite are still in progress.

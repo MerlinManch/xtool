@@ -23,7 +23,7 @@ extension SDKBuilder {
             try requireWindowsExecutable(source.appending(path: "bin/\(name)"))
         }
         do {
-            try FileManager.default.copyItem(at: source, to: directory)
+            try FileManager.default.copyWindowsTree(at: source, to: directory)
         } catch {
             throw Console.Error("Could not copy toolset '\(source.path)' to '\(directory.path)': \(error)")
         }
@@ -53,7 +53,7 @@ extension SDKBuilder {
         for file in try FileManager.default.contentsOfDirectory(at: source, includingPropertiesForKeys: nil) {
             let destination = output.appendingPathComponent(file.lastPathComponent)
             do {
-                try FileManager.default.copyItem(at: file, to: destination)
+                try FileManager.default.copyWindowsTree(at: file, to: destination)
             } catch {
                 throw Console.Error("Could not copy macro resource '\(file.path)' to '\(destination.path)': \(error)")
             }

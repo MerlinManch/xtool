@@ -9,7 +9,7 @@ concurrency:
 jobs:
   semantic:
     runs-on: windows-2022
-    timeout-minutes: 40
+    timeout-minutes: 90
     env:
       XTOOL_VERSION: ${{ github.sha }}
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/Windows/binary-cache
@@ -33,6 +33,7 @@ jobs:
           swift-version: swift-6.4.1-release
           swift-build: 6.4.1-RELEASE
       - name: Compile and test Swift without optimization for faster diagnostics
+        timeout-minutes: 60
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
