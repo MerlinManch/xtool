@@ -1,0 +1,36 @@
+name: Native Windows Darwin integration
+on:
+  push:
+    paths: ['Windows/test-toolset.ps1', '.github/workflows/windows-toolset-test.yml']
+  workflow_dispatch:
+    inputs:
+      toolset_run:
+        description: Successful SDK-tools artifact run
+        default: '38872672622'
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  toolset-integration:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtool-windows-sdk-tools-x64
+          run-id: ${{ inputs.toolset_run || '38872672622' }}
+          github-token: ${{ github.token }}
+          path: Windows/dist/bin
+      - uses: compnerd/gha-setup-swift@86d1ddeaf915c282137601aeb0654ea0e7b7f17e
+        with:
+          swift-version: swift-6.4.1-release
+          swift-build: 6.4.1-RELEASE
+      - name: Verify real Mach-O linking, Apple archives and dSYM output
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -property installationPath
+          Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          ./Windows/test-toolset.ps1

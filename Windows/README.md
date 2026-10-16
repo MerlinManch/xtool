@@ -95,14 +95,16 @@ Verified so far:
 
 - Native Windows Anisette DLL builds and passes export/error-boundary tests.
   The public Apple Music APK's x86_64 libraries initialize successfully; Android
-  ID, provisioning directory and unprovisioned-login calls cross the ABI boundary.
+  ID and provisioning-directory calls cross the ABI boundary. Complete anonymous
+  Apple provisioning and local OTP generation also pass; no Apple ID is used.
 - 17 native helper tests and the Win32 lock/DPAPI tests pass on Windows.
   The archive suite also passes on Linux: response-file forwarding, exit status,
   raw/compressed PBZX, Unicode, hard/symbolic links, executable modes, malformed
   archives, traversal and symlink escapes. Directory symlinks and forward
   link chains are covered in both XIP and IPA extraction.
-- The native macro server builds on Windows and passes startup/protocol-EOF
-  verification.
+- The native LLVM linker, Apple librarian and dsymutil build from the pinned
+  fork on Windows. The native macro server also builds and passes startup/
+  protocol-EOF verification.
 - Windows PathKit branches pass semantic compilation and functional normalization/
   glob checks using Swift 6.4.1; Windows integration tests are included.
 - Windows-target syntax parsing passes for 131 non-generated Swift source files.
@@ -112,8 +114,8 @@ Pending Windows CI results and integration coverage:
 
 - Complete CLI build and `swift test`, HTTP/WebSocket loopback tests, project
   creation/redirected console tests and a synthetic Windows SDK integration test.
-- LLVM build, real Xcode SDK install/update/remove and example
-  compilation including SwiftUI macros and SwiftBuild/BSP.
+- Real Xcode SDK install/update/remove and example compilation including
+  SwiftUI macros and SwiftBuild/BSP.
 - Apple ID/2FA, ASC keys, account provisioning and real-device USB/network
   signing/install/launch/uninstall. These require external credentials/hardware.
 - ARM64 support is not release-validated; the complete build targets x64 and the
