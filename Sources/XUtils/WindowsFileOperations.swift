@@ -3,11 +3,10 @@ import Foundation
 import WinSDK
 
 extension FileManager {
-
     /// Remove a Windows tree without following directory reparse points or
     /// changing attributes shared with retained NTFS hardlinks.
     package func removeWindowsTree(at url: URL) throws {
-        let absolute = url.standardizedFileURL
+        let absolute = url.absoluteURL
         let path = absolute.path.replacingOccurrences(of: "/", with: "\\")
         let nativePath: String
         if path.hasPrefix("\\\\?\\") {

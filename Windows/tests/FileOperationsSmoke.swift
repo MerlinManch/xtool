@@ -113,7 +113,7 @@ import WinSDK
             try manager.createDirectory(at: deep, withIntermediateDirectories: false)
         }
         try Data("long path".utf8).write(to: deep.appendingPathComponent("readonly.3pm"))
-        try require(deep.appendingPathComponent("readonly.3pm").path.withCString(encodedAs: UTF16.self) {
+        try require(("\\\\?\\" + deep.appendingPathComponent("readonly.3pm").path.replacingOccurrences(of: "/", with: "\\")).withCString(encodedAs: UTF16.self) {
             SetFileAttributesW($0, DWORD(FILE_ATTRIBUTE_READONLY))
         }, "Could not make the long-path file readonly")
         let cwd = manager.currentDirectoryPath

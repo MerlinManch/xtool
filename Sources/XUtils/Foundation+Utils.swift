@@ -24,7 +24,6 @@ extension Data {
 }
 
 extension FileManager {
-
     /// Remove owned trees using Windows handle-based deletion. This preserves
     /// attributes of surviving hardlinks and never follows directory links.
     package func removeOwnedTree(at url: URL) throws {
@@ -34,7 +33,6 @@ extension FileManager {
         try removeItem(at: url)
         #endif
     }
-
 
     /// Like `copyItem(at:to:)` but allows opting out of preserving the owner
     package func copyItem(
