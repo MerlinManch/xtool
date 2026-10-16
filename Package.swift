@@ -199,6 +199,7 @@ let package = Package(
                 "XUtils",
                 .product(name: "Subprocess", package: "swift-subprocess", condition: .when(platforms: [.windows])),
                 .product(name: "SystemPackage", package: "swift-system", condition: .when(platforms: [.windows])),
+                .product(name: "CryptoExtras", package: "swift-crypto", condition: .when(platforms: [.windows])),
                 "XKit",
                 "XToolSupport",
                 "PackLib",
