@@ -68,10 +68,10 @@ index a1d8fbf..811efa5 100644
 +    cxxLanguageStandard: .cxx17
  )
 diff --git a/build/windows/vs2022/zsign/src/common_win32.h b/build/windows/vs2022/zsign/src/common_win32.h
-index ea9a15b..ed25127 100644
+index ea9a15b..6923925 100644
 --- a/build/windows/vs2022/zsign/src/common_win32.h
 +++ b/build/windows/vs2022/zsign/src/common_win32.h
-@@ -1,42 +1,28 @@
+@@ -1,42 +1,70 @@
 -#pragma once
 -
 -#ifndef WINVER
@@ -118,15 +118,11 @@ index ea9a15b..ed25127 100644
 +#pragma once
 +
 +#ifndef WINVER
-+#define WINVER 0x0501
++#define WINVER 0x0A00
 +#endif
 +
 +#ifndef _WIN32_WINNT
-+#define _WIN32_WINNT 0x0501
-+#endif
-+
-+#ifndef _WIN32_WINDOWS
-+#define _WIN32_WINDOWS 0x0410
++#define _WIN32_WINNT 0x0A00
 +#endif
 +
 +#define WIN32_LEAN_AND_MEAN
@@ -137,12 +133,58 @@ index ea9a15b..ed25127 100644
 +#include <Shlwapi.h>
 +#include <shellapi.h>
 +#include <direct.h>
++#include <stdio.h>
++#include <wchar.h>
++#include <string>
++#include <vector>
++#include <filesystem>
++#include <system_error>
++
++// Swift and the public signer API use UTF-8 regardless of the host's ACP.
++inline std::wstring ZWinWide(const char* text) {
++    if (!text || !*text) return {};
++    int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, NULL, 0);
++    if (!count) return {};
++    std::wstring wide((size_t)count, L'\0');
++    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, &wide[0], count)) return {};
++    wide.resize((size_t)count - 1);
++    return wide;
++}
++inline std::string ZWinUTF8(const wchar_t* text) {
++    if (!text || !*text) return {};
++    int count = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text, -1, NULL, 0, NULL, NULL);
++    if (!count) return {};
++    std::string utf8((size_t)count, '\0');
++    if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text, -1, &utf8[0], count, NULL, NULL)) return {};
++    utf8.resize((size_t)count - 1);
++    return utf8;
++}
++inline std::wstring ZWinAbsolutePath(const char* text) {
++    std::wstring path = ZWinWide(text);
++    for (auto& character : path) if (character == L'/') character = L'\\';
++    if (path.empty() || path.compare(0, 4, L"\\\\?\\") == 0) return path;
++    DWORD count = GetFullPathNameW(path.c_str(), 0, NULL, NULL);
++    if (!count) return {};
++    std::wstring absolute(count, L'\0');
++    DWORD written = GetFullPathNameW(path.c_str(), count, &absolute[0], NULL);
++    if (!written || written >= count) return {};
++    absolute.resize(written);
++    return absolute;
++}
++inline std::wstring ZWinPath(const char* text) {
++    auto path = ZWinAbsolutePath(text);
++    if (path.empty() || path.compare(0, 4, L"\\\\?\\") == 0) return path;
++    return path.compare(0, 2, L"\\\\") == 0 ? L"\\\\?\\UNC\\" + path.substr(2) : L"\\\\?\\" + path;
++}
++inline int ZWinFOpen(FILE** file, const char* path, const char* mode) {
++    return _wfopen_s(file, ZWinPath(path).c_str(), ZWinWide(mode).c_str());
++}
 +#include "iconv.h"
 +
 +
 +#define PATH_MAX					4096
 +
-+#define _fopen64(fp, path, mode)	{ fopen_s(&fp, path, mode); }
++#define _fopen64(fp, path, mode)	{ ZWinFOpen(&fp, path, mode); }
 diff --git a/build/windows/vs2022/zsign/src/iconv.h b/build/windows/vs2022/zsign/src/iconv.h
 index 4495733..921984f 100644
 --- a/build/windows/vs2022/zsign/src/iconv.h
@@ -155,25 +197,336 @@ index 4495733..921984f 100644
  #include <vector>
  using namespace std;
  
+diff --git a/src/bundle.cpp b/src/bundle.cpp
+index ef4542c..927e0d9 100644
+--- a/src/bundle.cpp
++++ b/src/bundle.cpp
+@@ -129,7 +129,7 @@ bool ZBundle::GetObjectsToSign(const string& strFolder, jvalue& jvInfo)
+ 		{
+ 			FILE* fp = NULL;
+ #ifdef _WIN32
+-			fopen_s(&fp, strPath.c_str(), "rb");
++			ZWinFOpen(&fp, strPath.c_str(), "rb");
+ #else
+ 			fp = fopen(strPath.c_str(), "rb");
+ #endif
+@@ -168,10 +168,6 @@ bool ZBundle::GenerateCodeResources(const string& strFolder, jvalue& jvCodeRes)
+ 	jvInfo.read_plist_from_file("%s/Info.plist", strFolder.c_str());
+ 	string strBundleExe = jvInfo["CFBundleExecutable"];
+ 
+-#ifdef _WIN32
+-	iconv ic;
+-	strBundleExe = ic.U82A(strBundleExe);
+-#endif
+ 
+ 	setFiles.erase("_CodeSignature/CodeResources");
+ 	setFiles.erase(strBundleExe);
+@@ -183,7 +179,7 @@ bool ZBundle::GenerateCodeResources(const string& strFolder, jvalue& jvCodeRes)
+ 	for (string strKey : setFiles) {
+ 		if (m_bRemoveProvision && strKey == "embedded.mobileprovision") {
+ 			string strProvFile = strFolder + "/embedded.mobileprovision";
+-			remove(strProvFile.c_str());
++			ZFile::RemoveFile(strProvFile.c_str());
+ 			ZLog::Print(">>> Removed embedded.mobileprovision\n");
+ 			continue;
+ 		}
+@@ -193,9 +189,6 @@ bool ZBundle::GenerateCodeResources(const string& strFolder, jvalue& jvCodeRes)
+ 		string strSHA256Base64;
+ 		ZSHA::SHABase64File(strFile.c_str(), strSHA1Base64, strSHA256Base64);
+ 
+-#ifdef _WIN32
+-		strKey = ic.A2U8(strKey);
+-#endif
+ 
+ 		bool bomit1 = false;
+ 		bool bomit2 = false;
+@@ -345,10 +338,6 @@ bool ZBundle::SignNode(jvalue& jvNode)
+ 		return false;
+ 	}
+ 
+-#ifdef _WIN32
+-	iconv ic;
+-	strBundleExe = ic.U82A(strBundleExe);
+-#endif
+ 
+ 	string strBaseFolder = m_strAppFolder;
+ 	if ("/" != strFolder) {
+@@ -669,10 +658,6 @@ bool ZBundle::ModifyBundleInfo(const string& strBundleId, const string& strBundl
+ 
+ 		string strNewDisplayName = strDisplayName;
+ 
+-#ifdef _WIN32
+-		iconv ic;
+-		strNewDisplayName = ic.A2U8(strDisplayName);
+-#endif
+ 
+ 		string strOldDisplayName = jvInfo["CFBundleDisplayName"];
+ 		if (strOldDisplayName.empty()) {
+@@ -696,10 +681,6 @@ bool ZBundle::ModifyBundleInfo(const string& strBundleId, const string& strBundl
+ 			jvInfoStrings.style_write_plist_to_file("%s/zh-Hans.lproj/InfoPlist.strings", m_strAppFolder.c_str());
+ 		}
+ 
+-#ifdef _WIN32
+-		strOldDisplayName = ic.U82A(strOldDisplayName);
+-		strNewDisplayName = ic.U82A(strNewDisplayName);
+-#endif
+ 
+ 		ZLog::PrintV(">>> BundleName: %s -> %s\n", strOldDisplayName.c_str(), strNewDisplayName.c_str());
+ 	}
+@@ -866,10 +847,6 @@ bool ZBundle::SignFolder(ZSignAsset* pSignAsset,
+ 
+ 	string strAppName = jvRoot["name"];
+ 
+-#ifdef _WIN32
+-	iconv ic;
+-	strAppName = ic.U82A(strAppName);
+-#endif
+ 
+ 	ZLog::PrintV(">>> Signing: \t%s ...\n", m_strAppFolder.c_str());
+ 	ZLog::PrintV(">>> AppName: \t%s\n", strAppName.c_str());
+diff --git a/src/common/common.h b/src/common/common.h
+index 1d5ef34..fde0bee 100644
+--- a/src/common/common.h
++++ b/src/common/common.h
+@@ -44,11 +44,13 @@
+ #include <functional>
+ using namespace std;
+ 
+-#define FORMAT_V(x, format) char format[1024] = { 0 }; \
+-                        	va_list va_args; \
+-							va_start(va_args, x); \
+-							vsnprintf(format, 1024, x, va_args); \
+-							va_end(va_args);
++#define FORMAT_V(x, format) \
++    va_list va_args; va_start(va_args, x); \
++    va_list va_copy_args; va_copy(va_copy_args, va_args); \
++    int format##_length = vsnprintf(NULL, 0, x, va_copy_args); va_end(va_copy_args); \
++    std::vector<char> format##_buffer(format##_length < 0 ? 1 : (size_t)format##_length + 1); \
++    vsnprintf(format##_buffer.data(), format##_buffer.size(), x, va_args); va_end(va_args); \
++    char* format = format##_buffer.data();
+ 
+ #include "fs.h"
+ #include "sha.h"
 diff --git a/src/common/fs.cpp b/src/common/fs.cpp
-index 35d226f..2b5b2c8 100644
+index 35d226f..6d2e08e 100644
 --- a/src/common/fs.cpp
 +++ b/src/common/fs.cpp
-@@ -481,7 +481,7 @@ bool ZFile::EnumFolder(const char* szFolder, bool bRecursive, enum_folder_callba
+@@ -5,11 +5,19 @@
+ #endif
+ 
+ map<void*, void*> ZFile::s_mapFiles;
++#ifdef _WIN32
++static std::mutex s_windowsMapsMutex;
++#endif
+ 
+ bool ZFile::IsRegularFile(const char* path)
+ {
++#ifdef _WIN32
++    DWORD attributes = GetFileAttributesW(ZWinPath(path).c_str());
++    return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
++#else
+ 	struct stat st = { 0 };
+ 	return 0 == stat(path, &st) && S_ISREG(st.st_mode);
++#endif
+ }
+ 
+ void* ZFile::MapFile(const char* path, size_t offset, size_t size, size_t* psize, bool ro)
+@@ -18,20 +26,29 @@ void* ZFile::MapFile(const char* path, size_t offset, size_t size, size_t* psize
+ 
+ #ifdef _WIN32
+ 
+-	HANDLE hFile = ::CreateFileA(path, ro ? GENERIC_READ : (GENERIC_READ | GENERIC_WRITE), ro ? FILE_SHARE_READ : (FILE_SHARE_READ | FILE_SHARE_WRITE), NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
++	HANDLE hFile = ::CreateFileW(ZWinPath(path).c_str(), ro ? GENERIC_READ : (GENERIC_READ | GENERIC_WRITE), ro ? FILE_SHARE_READ : (FILE_SHARE_READ | FILE_SHARE_WRITE), NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+ 	if (INVALID_HANDLE_VALUE != hFile) {
+-		if (size <= 0) {
+-			size = ::GetFileSize(hFile, NULL);
+-		}
++        LARGE_INTEGER length;
++        if (!GetFileSizeEx(hFile, &length) || (uint64_t)offset > (uint64_t)length.QuadPart) {
++            CloseHandle(hFile);
++            return NULL;
++        }
++        if (size == 0) size = (size_t)((uint64_t)length.QuadPart - offset);
++        if (size == 0 || size > (uint64_t)length.QuadPart - offset) {
++            CloseHandle(hFile);
++            return NULL;
++        }
+ 
+ 		if (NULL != psize) {
+ 			*psize = size;
+ 		}
+ 
+-		HANDLE hMap = ::CreateFileMapping(hFile, NULL, ro ? PAGE_READONLY : PAGE_READWRITE, 0, (DWORD)size, NULL);
++		HANDLE hMap = ::CreateFileMappingW(hFile, NULL, ro ? PAGE_READONLY : PAGE_READWRITE, 0, 0, NULL);
+ 		if (NULL != hMap) {
+-			base = ::MapViewOfFile(hMap, ro ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS, 0, 0, size);
++			base = ::MapViewOfFile(hMap, ro ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS,
++                                   (DWORD)((uint64_t)offset >> 32), (DWORD)offset, size);
+ 			if (NULL != base) {
++                std::lock_guard<std::mutex> lock(s_windowsMapsMutex);
+ 				s_mapFiles[base] = hMap;
+ 			} else {
+ 				::CloseHandle(hMap);
+@@ -69,6 +86,7 @@ void* ZFile::MapFile(const char* path, size_t offset, size_t size, size_t* psize
+ bool ZFile::UnmapFile(void* base, size_t size)
+ {
+ #ifdef _WIN32
++    std::lock_guard<std::mutex> lock(s_windowsMapsMutex);
+ 	auto it = s_mapFiles.find(base);
+ 	if (it != s_mapFiles.end()) {
+ 		::UnmapViewOfFile(base);
+@@ -190,7 +208,8 @@ bool ZFile::AppendFile(const char* szFile, const string& strData)
+ bool ZFile::IsFolder(const char* szFolder)
+ {
+ #ifdef _WIN32
+-	return ::PathIsDirectoryA(szFolder);
++    DWORD attributes = GetFileAttributesW(ZWinPath(szFolder).c_str());
++    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY);
+ #else
+ 	struct stat st = { 0 };
+ 	return 0 == stat(szFolder, &st) && S_ISDIR(st.st_mode);
+@@ -208,10 +227,9 @@ bool ZFile::CreateFolder(const char* szFolder)
+ 	string strPath = GetFullPath(szFolder);
+ 	if (!IsFolder(strPath.c_str())) {
+ #ifdef _WIN32
+-		int32_t nRet = ::SHCreateDirectoryExA(NULL, strPath.c_str(), NULL);
+-		if (ERROR_SUCCESS != nRet && ERROR_ALREADY_EXISTS != nRet) {
+-			return false;
+-		}
++        std::error_code error;
++        std::filesystem::create_directories(ZWinPath(strPath.c_str()), error);
++        return !error;
+ #else
+ 		size_t pos = 0;
+ 		pos = strPath.find('/', pos);
+@@ -259,16 +277,9 @@ bool ZFile::RemoveFolder(const char* szFolder)
+ 		return true;
+ 	}
+ #ifdef _WIN32
+-	string strFolder = szFolder;
+-	strFolder.push_back('\0');
+-
+-	SHFILEOPSTRUCTA shfs;
+-	memset(&shfs, 0, sizeof(shfs));
+-	shfs.wFunc = FO_DELETE;
+-	shfs.pFrom = strFolder.c_str();
+-	shfs.fFlags = FOF_NOCONFIRMATION;
+-	shfs.fFlags |= (FOF_SILENT | FOF_NOERRORUI);
+-	return (0 == ::SHFileOperationA(&shfs));
++    std::error_code error;
++    std::filesystem::remove_all(ZWinPath(szFolder), error);
++    return !error;
+ #else
+ 	return nftw(szFolder, RemoveFolderCallBack, 64, FTW_DEPTH | FTW_PHYS);
+ #endif
+@@ -282,7 +293,11 @@ bool ZFile::RemoveFolderV(const char* szPath, ...)
+ 
+ bool ZFile::RemoveFile(const char* szFile)
+ {
++#ifdef _WIN32
++    return DeleteFileW(ZWinPath(szFile).c_str()) != 0;
++#else
+ 	return (0 == remove(szFile));
++#endif
+ }
+ 
+ bool ZFile::RemoveFileV(const char* szPath, ...)
+@@ -298,7 +313,7 @@ bool ZFile::IsFileExists(const char* szFile)
+ 	}
+ 
+ #ifdef _WIN32
+-	return ::PathFileExistsA(szFile);
++	return GetFileAttributesW(ZWinPath(szFile).c_str()) != INVALID_FILE_ATTRIBUTES;
+ #else
+ 	return (0 == access(szFile, F_OK));
+ #endif
+@@ -328,7 +343,7 @@ bool ZFile::IsZipFile(const char* szFile)
+ bool ZFile::CopyFile(const char* szSrcFile, const char* szDestFile)
+ {
+ #ifdef _WIN32
+-	return ::CopyFileA(szSrcFile, szDestFile, FALSE) ? true : false;
++	return ::CopyFileW(ZWinPath(szSrcFile).c_str(), ZWinPath(szDestFile).c_str(), FALSE) ? true : false;
+ #else 
+ 
+ 	int src_id = -1;
+@@ -375,10 +390,8 @@ string ZFile::GetFullPath(const char* szPath)
+ 	string strPath = szPath;
+ 	if (!strPath.empty()) {
+ #ifdef _WIN32
+-		char path[PATH_MAX] = { 0 };
+-		if (NULL != _fullpath(path, szPath, PATH_MAX)) {
+-			strPath = path;
+-		}
++        auto fullPath = ZWinAbsolutePath(szPath);
++        if (!fullPath.empty()) strPath = ZWinUTF8(fullPath.c_str());
+ 		ZUtil::StringReplace(strPath, "/", "\\");
+ #else
+ 		char path[PATH_MAX] = { 0 };
+@@ -449,9 +462,10 @@ const char* ZFile::GetTempFolder()
+ 	if (s_strTempFolder.empty()) {
+ 		call_once(s_flag, [&]() {
+ #ifdef _WIN32
+-			char szTempPath[PATH_MAX] = { 0 };
+-			if (0 != ::GetTempPathA(PATH_MAX, szTempPath)) {
+-				s_strTempFolder = szTempPath;
++            std::vector<wchar_t> tempPath(32768);
++            DWORD written = GetTempPathW((DWORD)tempPath.size(), tempPath.data());
++            if (written && written < tempPath.size()) {
++                s_strTempFolder = ZWinUTF8(tempPath.data());
+ 			} else {
+ 				s_strTempFolder = GetFullPath("./");
+ 			}
+@@ -475,19 +489,19 @@ bool ZFile::EnumFolder(const char* szFolder, bool bRecursive, enum_folder_callba
+ 
+ #ifdef _WIN32
+ 	string strFromFolder = strFolder + "\\*";
+-	WIN32_FIND_DATAA fd = { 0 };
+-	HANDLE hFind = ::FindFirstFileA(strFromFolder.c_str(), &fd);
++	WIN32_FIND_DATAW fd = { 0 };
++	HANDLE hFind = ::FindFirstFileW(ZWinPath(strFromFolder.c_str()).c_str(), &fd);
+ 	if (INVALID_HANDLE_VALUE == hFind) {
  		return false;
  	}
  
 -	while (::FindNextFileA(hFind, &fd)) {
+-		if (0 == strcmp(fd.cFileName, ".") || 0 == strcmp(fd.cFileName, "..")) {
 +	do {
- 		if (0 == strcmp(fd.cFileName, ".") || 0 == strcmp(fd.cFileName, "..")) {
++		if (0 == wcscmp(fd.cFileName, L".") || 0 == wcscmp(fd.cFileName, L"..")) {
  			continue;
  		}
-@@ -504,6 +504,7 @@ bool ZFile::EnumFolder(const char* szFolder, bool bRecursive, enum_folder_callba
+ 
+-		string strName = fd.cFileName;
+-		string strPath = strFolder + "\\" + strName;
++		string strName = ZWinUTF8(fd.cFileName);
++		string strPath = strFolder + "/" + strName;
+ 		bool bFolder = (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? true : false;
+ 
+ 		if (NULL != filter) {
+@@ -504,6 +518,7 @@ bool ZFile::EnumFolder(const char* szFolder, bool bRecursive, enum_folder_callba
  			EnumFolder(strPath.c_str(), bRecursive, filter, callback);
  		}
  	}
-+	while (::FindNextFileA(hFind, &fd));
++	while (::FindNextFileW(hFind, &fd));
  	::FindClose(hFind);
+ 
+ #else
+diff --git a/src/common/json.cpp b/src/common/json.cpp
+index 0038394..608aae9 100644
+--- a/src/common/json.cpp
++++ b/src/common/json.cpp
+@@ -1,3 +1,6 @@
++#ifdef _WIN32
++#include "common.h"
++#endif
+ #include "json.h"
+ #include <time.h>
+ #include <math.h>
+@@ -10,7 +13,6 @@ using namespace std;
+ 
+ #ifdef _WIN32
+ 
+-#define _fopen64(fp, path, mode)	{ fopen_s(&fp, path, mode); }
+ #define PRId64						"lld"
  
  #else
 diff --git a/src/lib/Zupersign.cpp b/src/lib/Zupersign.cpp
@@ -201,3 +554,35 @@ index 7b941e1..afc9235 100644
  }
  
  int zsign_sign(
+diff --git a/src/macho.cpp b/src/macho.cpp
+index a55b3fa..961a523 100644
+--- a/src/macho.cpp
++++ b/src/macho.cpp
+@@ -182,7 +182,12 @@ bool ZMachO::ReallocCodeSignSpace()
+ 		CloseFile();
+ 		ZFile::RemoveFile(m_strFile.c_str());
+ 		string strNewArchOFile = m_strFile + ".archo.0";
+-		if (0 == rename(strNewArchOFile.c_str(), m_strFile.c_str())) {
++		#ifdef _WIN32
++        if (MoveFileExW(ZWinPath(strNewArchOFile.c_str()).c_str(), ZWinPath(m_strFile.c_str()).c_str(), MOVEFILE_REPLACE_EXISTING))
++#else
++        if (0 == rename(strNewArchOFile.c_str(), m_strFile.c_str()))
++#endif
++        {
+ 			return OpenFile(m_strFile.c_str());
+ 		}
+ 	} else { //fat
+@@ -249,7 +254,12 @@ bool ZMachO::ReallocCodeSignSpace()
+ 		}
+ 
+ 		ZFile::RemoveFile(m_strFile.c_str());
+-		if (0 == rename(strNewFatMachOFile.c_str(), m_strFile.c_str())) {
++		#ifdef _WIN32
++        if (MoveFileExW(ZWinPath(strNewFatMachOFile.c_str()).c_str(), ZWinPath(m_strFile.c_str()).c_str(), MOVEFILE_REPLACE_EXISTING))
++#else
++        if (0 == rename(strNewFatMachOFile.c_str(), m_strFile.c_str()))
++#endif
++        {
+ 			return OpenFile(m_strFile.c_str());
+ 		}
+ 	}

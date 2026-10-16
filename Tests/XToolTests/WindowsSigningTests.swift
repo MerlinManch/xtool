@@ -1,6 +1,7 @@
 #if os(Windows)
 import Foundation
 import CryptoExtras
+import Crypto
 import Subprocess
 import SystemPackage
 import Testing
@@ -14,9 +15,14 @@ import X509
 )
 func windowsNativeSigningAndAnalysis(certificateSigning: Bool) async throws {
     let helpers = try #require(ProcessInfo.processInfo.environment["XTOOL_NATIVE_BIN"])
-    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    var root = temporary.appendingPathComponent("native signing ü 🔏")
+    for index in 0..<6 {
+        root.appendPathComponent("long-directory-\(index)-" + String(repeating: "x", count: 42))
+    }
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(root.path.count > 300)
     let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .appendingPathComponent("Fixtures/unsigned-macho.zip.base64")
     let encoded = try String(contentsOf: fixture, encoding: .utf8)
@@ -29,22 +35,17 @@ func windowsNativeSigningAndAnalysis(certificateSigning: Bool) async throws {
         output: .currentStandardOutput,
         error: .currentStandardError
     ).checkSuccess()
-    let app = root.appendingPathComponent("Fixture.app")
-    try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
-    let executable = app.appendingPathComponent("Fixture")
-    try FileManager.default.moveItem(at: root.appendingPathComponent("library.dylib"), to: executable)
-    let info: [String: Any] = [
-        "CFBundleIdentifier": "com.example.xtool.native-fixture",
-        "CFBundleExecutable": "Fixture",
-        "CFBundleName": "Fixture",
-        "CFBundlePackageType": "APPL",
-        "CFBundleVersion": "1",
-        "CFBundleSupportedPlatforms": ["iPhoneOS"],
-        "MinimumOSVersion": "17.0",
-    ]
-    try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
-        .write(to: app.appendingPathComponent("Info.plist"))
-    let unsigned = try Data(contentsOf: executable)
+    let unsigned = try Data(contentsOf: root.appendingPathComponent("library.dylib"))
+    let app = root.appendingPathComponent("Ü App.app")
+    let outer = app.appendingPathComponent("Frameworks/Outer.framework")
+    let inner = outer.appendingPathComponent("Frameworks/Inner.framework")
+    let executable = try makeNativeSigningBundle(at: app, executableData: unsigned, identifier: "com.example.xtool.fixture")
+    _ = try makeNativeSigningBundle(at: outer, executableData: unsigned, identifier: "com.example.xtool.fixture.outer")
+    _ = try makeNativeSigningBundle(at: inner, executableData: unsigned, identifier: "com.example.xtool.fixture.inner")
+    let resource = app.appendingPathComponent("Resources/über🔏.txt")
+    let resourceData = Data("native Unicode resource 🔏".utf8)
+    try FileManager.default.createDirectory(at: resource.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try resourceData.write(to: resource)
     #expect(nativeMachOSignature(unsigned) == nil)
     let signer = try Signer.first()
     #expect(await signer.name == "zsign")
@@ -84,11 +85,41 @@ func windowsNativeSigningAndAnalysis(certificateSigning: Bool) async throws {
     if let certificateData {
         _ = try #require(signature.range(of: Data([0xfa, 0xde, 0x0b, 0x01])))
         _ = try #require(signature.range(of: certificateData))
-        try await verifyNativeCMS(signature, in: root)
+        try await verifyNativeCMS(signature, in: temporary)
     }
-    #expect(FileManager.default.fileExists(atPath: app.appendingPathComponent("_CodeSignature/CodeResources").path))
+    try verifyNativeResource(in: app, path: "Resources/über🔏.txt", data: resourceData)
+    let innerExecutable = inner.appendingPathComponent("Über🔏")
+    let nestedData = try Data(contentsOf: innerExecutable)
+    _ = try #require(nativeMachOSignature(nestedData))
+    try verifyNativeResource(in: outer, path: "Frameworks/Inner.framework/Über🔏", data: nestedData)
     let extracted = try await signer.analyze(executable: executable)
     #expect(try PropertyListSerialization.propertyList(from: extracted, format: nil) is [String: Any])
+}
+
+private func makeNativeSigningBundle(at app: URL, executableData: Data, identifier: String) throws -> URL {
+    try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
+    let executable = app.appendingPathComponent("Über🔏")
+    try executableData.write(to: executable)
+    let info: [String: Any] = [
+        "CFBundleIdentifier": identifier,
+        "CFBundleExecutable": "Über🔏",
+        "CFBundleName": app.deletingPathExtension().lastPathComponent,
+        "CFBundlePackageType": app.pathExtension == "app" ? "APPL" : "FMWK",
+        "CFBundleVersion": "1",
+        "CFBundleSupportedPlatforms": ["iPhoneOS"],
+        "MinimumOSVersion": "17.0",
+    ]
+    try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+        .write(to: app.appendingPathComponent("Info.plist"))
+    return executable
+}
+
+private func verifyNativeResource(in app: URL, path: String, data: Data) throws {
+    let resources = try Data(contentsOf: app.appendingPathComponent("_CodeSignature/CodeResources"))
+    let manifest = try #require(PropertyListSerialization.propertyList(from: resources, format: nil) as? [String: Any])
+    let entries = try #require(manifest["files2"] as? [String: Any])
+    let entry = try #require(entries[path] as? [String: Any])
+    #expect(entry["hash2"] as? Data == Data(SHA256.hash(data: data)))
 }
 
 private func verifyNativeCMS(_ signature: Data, in root: URL) async throws {
