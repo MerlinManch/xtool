@@ -47,3 +47,7 @@ jobs:
         with:
           path: Windows/binary-cache
           key: windows-msvc-vcpkg-${{ hashFiles('Windows/vcpkg.json') }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xtool-windows-helpers-x64
+          path: Windows/dist/

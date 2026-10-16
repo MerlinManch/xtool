@@ -1,9 +1,10 @@
 // Streaming XAR -> PBZX/XZ -> CPIO extraction, using native libarchive/liblzma.
-// Memory is bounded by two PBZX chunks, independent of the Xcode archive size.
+// Payload memory is bounded by two PBZX chunks; directory/link/mode metadata is retained separately.
 #include <archive.h>
 #include <archive_entry.h>
 #include "deferred_symlinks.hpp"
 #include "case_sensitive_directories.hpp"
+#include "deferred_file_modes.hpp"
 #include <lzma.h>
 #include <array>
 #include <cerrno>
@@ -140,18 +141,21 @@ static int extract(const fs::path& input, const fs::path& output) {
     fs::current_path(output);
     DeferredSymlinks symlinks;
     CaseSensitiveDirectories directories;
+    DeferredFileModes modes;
     for (;;) {
         const auto status = archive_read_next_header(cpio.get(), &entry);
         if (status == ARCHIVE_EOF) break;
         check(status, cpio.get());
         directories.prepare(entry);
         if (!symlinks.defer(entry)) {
+            modes.prepare(entry);
             check(archive_read_extract2(cpio.get(), entry, disk.get()), cpio.get());
         }
     }
     stream.finish(cpio.get());
     symlinks.finish(disk.get());
     check(archive_write_close(disk.get()), disk.get());
+    modes.finish();
     check(archive_read_close(cpio.get()), cpio.get());
     return 0;
 }
