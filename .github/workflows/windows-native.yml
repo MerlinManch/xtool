@@ -6,7 +6,7 @@ on:
     paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/cli-tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Windows/patches/XcodeProj.patch', 'Windows/patches/swift-issue-reporting.patch', 'Windows/patches/combine-schedulers.patch', 'Windows/patches/swift-docc-plugin.patch', 'Windows/patches/swift-openapi-generator.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
   workflow_dispatch:
 concurrency:
-  group: windows-native-${{ github.ref }}
+  group: windows-native-spm-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   helpers:
@@ -66,11 +66,13 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           path: .build
-          key: windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          key: windows-native-spm-6.4.1-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
           restore-keys: |
+            windows-native-spm-6.4.1-
             windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-
             windows-swift-6.4.1-
       - name: Build and test complete Swift CLI
+        timeout-minutes: 90
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |

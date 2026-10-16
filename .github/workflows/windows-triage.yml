@@ -4,7 +4,7 @@ on:
     paths: ['Sources/**', 'Tests/**', 'Package.swift', 'Windows/build.ps1', 'Windows/patches/**', '.github/workflows/windows-triage.yml']
   workflow_dispatch:
 concurrency:
-  group: windows-semantic-${{ github.ref }}
+  group: windows-semantic-spm-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   semantic:
@@ -24,8 +24,9 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: .build
-          key: windows-semantic-6.4.1-${{ github.sha }}
+          key: windows-semantic-spm-6.4.1-${{ github.sha }}
           restore-keys: |
+            windows-semantic-spm-6.4.1-
             windows-semantic-6.4.1-
             windows-swift-6.4.1-
       - uses: compnerd/gha-setup-swift@86d1ddeaf915c282137601aeb0654ea0e7b7f17e
@@ -58,7 +59,7 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           path: .build
-          key: windows-semantic-6.4.1-${{ github.sha }}
+          key: windows-semantic-spm-6.4.1-${{ github.sha }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:

@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('debug', 'release')][string]$Configuration = 'release',
+    [ValidateSet('native', 'swiftbuild')][string]$BuildSystem = 'native',
     [ValidateSet('x64', 'arm64')][string]$Architecture = 'x64',
     [string]$VcpkgRoot = $env:VCPKG_ROOT,
     # Prefix with native MSVC-compatible OpenSSL, plist, usbmuxd,
@@ -131,7 +132,7 @@ $env:PATH = "$dist;$(Join-Path $NativeDependencyRoot 'bin');$previousPath"
 try {
     $include = Join-Path $NativeDependencyRoot 'include'
     $lib = Join-Path $NativeDependencyRoot 'lib'
-    $swiftOptions = @('-c', $Configuration,
+    $swiftOptions = @('-c', $Configuration, '--build-system', $BuildSystem,
         '-Xcc', "-I$include", '-Xcxx', "-I$include", '-Xswiftc', '-I', '-Xswiftc', $include,
         '-Xlinker', "/LIBPATH:$lib")
     # System-library module maps don't specify Windows import-library names.
@@ -140,7 +141,7 @@ try {
         $swiftOptions += @('-Xlinker', "$name.lib")
     }
     Invoke-Checked swift (@('build', '--product', 'xtool') + $swiftOptions)
-    $binPath = & swift build -c $Configuration --show-bin-path
+    $binPath = & swift build -c $Configuration --build-system $BuildSystem --show-bin-path
     if ($LASTEXITCODE -ne 0) { throw 'Could not locate Swift build output.' }
     Copy-Item (Join-Path $binPath 'xtool.exe') $dist -Force
     Invoke-Checked mt.exe @('-nologo', '-manifest', (Join-Path $PSScriptRoot 'xtool.exe.manifest'),

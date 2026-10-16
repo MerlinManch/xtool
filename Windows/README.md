@@ -37,6 +37,8 @@ An existing MSVC/UCRT native dependency prefix can be selected using
 must include `libssl`, `libcrypto`, `plist-2.0`, `usbmuxd-2.0`,
 `imobiledevice-glue-1.0` and `imobiledevice-1.0`. Do not substitute MinGW CRT
 libraries. The scripts do not modify SwiftPM checkout caches.
+The host CLI is built with SwiftPM's native backend; pass
+`-BuildSystem swiftbuild` to `build.ps1` to compare host build backends.
 
 ## Run
 
