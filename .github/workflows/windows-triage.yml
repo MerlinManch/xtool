@@ -1,0 +1,59 @@
+name: Native Windows semantic checks
+on:
+  push:
+    paths: ['.github/workflows/windows-triage.yml']
+  workflow_dispatch:
+concurrency:
+  group: windows-semantic-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  semantic:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/Windows/binary-cache
+    steps:
+      - uses: actions/checkout@v4
+      - shell: pwsh
+        run: New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+      - uses: actions/cache/restore@v4
+        with:
+          path: Windows/binary-cache
+          key: windows-msvc-vcpkg-${{ hashFiles('Windows/vcpkg.json') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: .build
+          key: windows-semantic-6.4.1-${{ github.sha }}
+          restore-keys: |
+            windows-semantic-6.4.1-
+            windows-swift-6.4.1-
+      - uses: compnerd/gha-setup-swift@86d1ddeaf915c282137601aeb0654ea0e7b7f17e
+        with:
+          swift-version: swift-6.4.1-release
+          swift-build: 6.4.1-RELEASE
+      - name: Compile and test Swift without optimization for faster diagnostics
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -property installationPath
+          Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          $global:XToolTriageSwiftExecutable = (Get-Command swift -CommandType Application).Source
+          function global:swift {
+            $forwarded = @($args)
+            if ($forwarded.Count -gt 0 -and $forwarded[0] -in @('build', 'test')) {
+              $forwarded += @('-Xswiftc', '-Onone')
+            }
+            & $global:XToolTriageSwiftExecutable @forwarded
+            $global:LASTEXITCODE = $LASTEXITCODE
+          }
+          try {
+            ./Windows/build.ps1 -RunTests -VcpkgRoot "$env:VCPKG_INSTALLATION_ROOT"
+          } finally {
+            Remove-Item Function:global:swift
+          }
+      - uses: actions/cache/save@v4
+        if: ${{ !cancelled() }}
+        with:
+          path: .build
+          key: windows-semantic-6.4.1-${{ github.sha }}
