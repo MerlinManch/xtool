@@ -148,8 +148,23 @@ try {
     Get-ChildItem (Join-Path $NativeDependencyRoot 'bin') -Filter '*.dll' | Copy-Item -Destination $dist -Force
     Get-ChildItem $binPath -Filter '*.dll' | Copy-Item -Destination $dist -Force
     if ($RunTests) {
-        Invoke-Checked (Join-Path $dist 'xtool.exe') @('--version')
         $env:XTOOL_NATIVE_BIN = $dist
+        $cliTestFailure = $null
+        try {
+            Invoke-Checked (Join-Path $dist 'xtool.exe') @('--version')
+            foreach ($command in @('', 'setup', 'auth', 'sdk', 'new', 'dev', 'ds', 'devices', 'install', 'uninstall', 'launch')) {
+                $helpArgs = if ($command) { @($command, '--help') } else { @('--help') }
+                Invoke-Checked (Join-Path $dist 'xtool.exe') $helpArgs
+            }
+            $env:XTOOL_CLI = Join-Path $dist 'xtool.exe'
+            Invoke-Checked python @('-m', 'unittest', 'discover', '-s',
+                (Join-Path $PSScriptRoot 'cli-tests'), '-v')
+        } catch {
+            $cliTestFailure = $_
+            Write-Host "::error::CLI integration tests failed: $_"
+        }
+        # Keep Swift and CLI integration independent: a failing test suite must
+        # not prevent the other suite from producing useful diagnostics.
         $portFile = Join-Path $build 'http-test-port.txt'
         Remove-Item $portFile -ErrorAction SilentlyContinue
         $serverInfo = [System.Diagnostics.ProcessStartInfo]::new('python')
@@ -171,15 +186,7 @@ try {
             Remove-Item Env:XTOOL_HTTP_TEST_URL -ErrorAction SilentlyContinue
             Remove-Item $portFile -ErrorAction SilentlyContinue
         }
-        foreach ($command in @('', 'setup', 'auth', 'sdk', 'new', 'dev', 'ds', 'devices', 'install', 'uninstall', 'launch')) {
-            $helpArgs = if ($command) { @($command, '--help') } else { @('--help') }
-            Invoke-Checked (Join-Path $dist 'xtool.exe') $helpArgs
-        }
-    }
-    if ($RunTests) {
-        $env:XTOOL_CLI = Join-Path $dist 'xtool.exe'
-        Invoke-Checked python @('-m', 'unittest', 'discover', '-s',
-            (Join-Path $PSScriptRoot 'cli-tests'), '-v')
+        if ($cliTestFailure) { throw $cliTestFailure }
     }
     $swiftLicenses = Join-Path $licenseRoot 'swift'
     foreach ($checkout in Get-ChildItem (Join-Path $root '.build/checkouts') -Directory) {
