@@ -1,10 +1,11 @@
 #if os(Windows)
 import CWindowsWebSocket
+import Dispatch
 import Foundation
 
 /// WinHTTP uses Windows certificate validation and native WebSocket framing.
 /// Operations are asynchronous in WinHTTP; cancellation closes their handles
-/// after the issuing call returns, and native callbacks retain pending buffers.
+/// after the issuing call returns. Pending buffers live through their native\n/// completion or closing callback.
 final class WindowsWebSocket: WebSocketSession, @unchecked Sendable {
     private struct Failure: LocalizedError {
         let code: UInt32
@@ -49,10 +50,15 @@ final class WindowsWebSocket: WebSocketSession, @unchecked Sendable {
     ) async throws -> Value {
         try await withTaskCancellationHandler {
             do {
-                let value = try await Task.detached { try operation(self) }.value
+                let value: Value = try await withCheckedThrowingContinuation { continuation in
+                    DispatchQueue.global(qos: .utility).async {
+                        continuation.resume(with: Result { try operation(self) })
+                    }
+                }
                 try Task.checkCancellation()
                 return value
             } catch {
+                xtool_ws_abort(self.handle)
                 try Task.checkCancellation()
                 throw error
             }
@@ -105,7 +111,7 @@ final class WindowsWebSocket: WebSocketSession, @unchecked Sendable {
     }
 
     func close() {
-        _ = Task.detached { xtool_ws_shutdown(self.handle) }
+        DispatchQueue.global(qos: .utility).async { xtool_ws_shutdown(self.handle) }
     }
 }
 #endif

@@ -164,6 +164,7 @@ static BOOL attach(xtool_websocket *state, HINTERNET handle, callback_context *c
     return TRUE;
 }
 int xtool_ws_connect(xtool_websocket *state, const uint16_t *url, uint32_t *error, uint32_t *http_status) {
+    retain(state);
     DWORD failure = ERROR_SUCCESS;
     wchar_t *host = NULL, *path = NULL, *user = NULL, *password = NULL;
     URL_COMPONENTS parts = {0};
@@ -175,6 +176,7 @@ int xtool_ws_connect(xtool_websocket *state, const uint16_t *url, uint32_t *erro
         !WinHttpCrackUrl((LPCWSTR)url, 0, 0, &parts) ||
         (parts.nScheme != INTERNET_SCHEME_HTTP && parts.nScheme != INTERNET_SCHEME_HTTPS)) {
         *error = ERROR_INVALID_PARAMETER;
+        release(state);
         return 0;
     }
     host = copy_wide(parts.lpszHostName, parts.dwHostNameLength);
@@ -262,10 +264,11 @@ done:
     free(host); free(path); free(user); free(password);
     if (failure) xtool_ws_abort(state);
     *error = failure;
+    release(state);
     return failure == ERROR_SUCCESS;
 }
 int xtool_ws_send(xtool_websocket *state, const void *data, uint32_t size, int text, uint32_t *error) {
-    static const unsigned char empty = 0;
+    retain(state);
     AcquireSRWLockExclusive(&state->write_lock);
     AcquireSRWLockExclusive(&state->handles_lock);
     DWORD failure = ERROR_OPERATION_ABORTED;
@@ -273,17 +276,19 @@ int xtool_ws_send(xtool_websocket *state, const void *data, uint32_t size, int t
         ResetEvent(state->write_done);
         failure = WinHttpWebSocketSend(state->socket,
             text ? WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE : WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE,
-            data ? (PVOID)data : (PVOID)&empty, size);
+            size ? (PVOID)data : NULL, size);
         if (failure == ERROR_IO_PENDING) failure = ERROR_SUCCESS;
     }
     ReleaseSRWLockExclusive(&state->handles_lock);
     if (!failure) failure = wait_for(state, state->write_done, &state->write_error);
     ReleaseSRWLockExclusive(&state->write_lock);
     *error = failure;
+    release(state);
     return failure == ERROR_SUCCESS;
 }
 int xtool_ws_receive(xtool_websocket *state, void **data, uint32_t *size, int *text,
                      uint32_t *close_status, uint32_t *error) {
+    retain(state);
     unsigned char chunk[65536];
     unsigned char *message = NULL;
     size_t count = 0, capacity = 0;
@@ -335,11 +340,17 @@ int xtool_ws_receive(xtool_websocket *state, void **data, uint32_t *size, int *t
     if (failure || *close_status) free(message);
     else { *data = message; *size = (uint32_t)count; *text = message_text == 1; }
     *error = failure;
+    release(state);
     return failure == ERROR_SUCCESS;
 }
 void xtool_ws_release_data(void *data) { free(data); }
 void xtool_ws_shutdown(xtool_websocket *state) {
-    AcquireSRWLockExclusive(&state->write_lock);
+    retain(state);
+    if (!TryAcquireSRWLockExclusive(&state->write_lock)) {
+        xtool_ws_abort(state);
+        release(state);
+        return;
+    }
     AcquireSRWLockExclusive(&state->handles_lock);
     DWORD failure = ERROR_OPERATION_ABORTED;
     if (!atomic_read(&state->closed) && state->socket) {
@@ -348,8 +359,9 @@ void xtool_ws_shutdown(xtool_websocket *state) {
         if (failure == ERROR_IO_PENDING) failure = ERROR_SUCCESS;
     }
     ReleaseSRWLockExclusive(&state->handles_lock);
-    if (!failure) (void)wait_for(state, state->shutdown_done, &state->shutdown_error);
+    if (!failure) (void)WaitForSingleObject(state->shutdown_done, 1000);
     ReleaseSRWLockExclusive(&state->write_lock);
     xtool_ws_abort(state);
+    release(state);
 }
 #endif
