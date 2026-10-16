@@ -32,6 +32,7 @@ let swiftSettings: [SwiftSetting] = {
 let nativePackages: [Package.Dependency] = [
     .package(path: "Windows/Dependencies/xtool-core"),
     .package(path: "Windows/Dependencies/zsign"),
+    .package(path: "Windows/Dependencies/PathKit"),
 ]
 #else
 let nativePackages: [Package.Dependency] = [
@@ -39,6 +40,7 @@ let nativePackages: [Package.Dependency] = [
     .package(url: "https://github.com/xtool-org/zsign", .upToNextMinor(from: "1.9.0")),
     .package(url: "https://github.com/xtool-org/xadi", .upToNextMinor(from: "0.4.2")),
     .package(url: "https://github.com/saagarjha/unxip", from: "3.2.0"),
+    .package(url: "https://github.com/kylef/PathKit", from: "1.0.1"),
 ]
 #endif
 
@@ -196,6 +198,7 @@ let package = Package(
                 "XKit",
                 "XToolSupport",
                 "PackLib",
+                .product(name: "PathKit", package: "PathKit", condition: .when(platforms: [.windows])),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "X509", package: "swift-certificates"),
             ],

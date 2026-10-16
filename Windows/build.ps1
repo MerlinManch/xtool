@@ -21,7 +21,8 @@ function Invoke-Checked([string]$Program, [string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "$Program failed with exit code $LASTEXITCODE" }
 }
 
-function Initialize-Dependency([string]$Name, [string]$Revision) {
+function Initialize-Dependency([string]$Name, [string]$Revision, [string]$RepositoryURL = "") {
+    if (-not $RepositoryURL) { $RepositoryURL = "https://github.com/xtool-org/$Name.git" }
     $destination = Join-Path $PSScriptRoot "Dependencies/$Name"
     if (Test-Path $destination) {
         # Refuse to overwrite developer changes on repeated builds.
@@ -32,7 +33,7 @@ function Initialize-Dependency([string]$Name, [string]$Revision) {
         Invoke-Checked git @('-C', $destination, 'apply', '--reverse', '--check', (Join-Path $PSScriptRoot "patches/$Name.patch"))
         return
     }
-    Invoke-Checked git @('clone', '--no-checkout', "https://github.com/xtool-org/$Name.git", $destination)
+    Invoke-Checked git @('clone', '--no-checkout', $RepositoryURL, $destination)
     Invoke-Checked git @('-C', $destination, 'checkout', '--detach', $Revision)
     Invoke-Checked git @('-C', $destination, 'apply', '--check', (Join-Path $PSScriptRoot "patches/$Name.patch"))
     Invoke-Checked git @('-C', $destination, 'apply', (Join-Path $PSScriptRoot "patches/$Name.patch"))
@@ -87,6 +88,7 @@ if (-not (Test-Path (Join-Path $NativeDependencyRoot 'include/libimobiledevice/l
 }
 Initialize-Dependency 'xtool-core' 'f867f9c2aea16ac78ca14d0d2f948b47db0732b4'
 Initialize-Dependency 'zsign' 'f6158be9e62a5ce2a53d72b1a6d880880da956c8'
+Initialize-Dependency 'PathKit' '3bfd2737b700b9a36565a8c94f4ad2b050a5e574' 'https://github.com/kylef/PathKit.git'
 Push-Location $root
 try {
     $include = Join-Path $NativeDependencyRoot 'include'

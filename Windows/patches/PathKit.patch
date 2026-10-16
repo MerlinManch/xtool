@@ -1,0 +1,242 @@
+diff --git a/Sources/PathKit.swift b/Sources/PathKit.swift
+index 3cf558f..5860da2 100644
+--- a/Sources/PathKit.swift
++++ b/Sources/PathKit.swift
+@@ -4,7 +4,7 @@
+ import Glibc
+ 
+ let system_glob = Glibc.glob
+-#else
++#elseif !os(Windows)
+ import Darwin
+ 
+ let system_glob = Darwin.glob
+@@ -37,7 +37,11 @@ public struct Path {
+   }
+     
+   internal init(_ path: String, fileSystemInfo: FileSystemInfo) {
++    #if os(Windows)
++    self.path = path.replacingOccurrences(of: "\\", with: "/")
++    #else
+     self.path = path
++    #endif
+     self.fileSystemInfo = fileSystemInfo
+   }
+ 
+@@ -120,7 +124,11 @@ extension Path {
+   /// - Returns: `true` iff the path begins with a slash
+   ///
+   public var isAbsolute: Bool {
++    #if os(Windows)
++    return !WindowsPaths.parse(path).root.isEmpty
++    #else
+     return path.hasPrefix(Path.separator)
++    #endif
+   }
+ 
+   /// Test whether a path is relative.
+@@ -155,7 +163,11 @@ extension Path {
+   ///   representation.
+   ///
+   public func normalize() -> Path {
++    #if os(Windows)
++    return Path(WindowsPaths.normalize(path))
++    #else
+     return Path(NSString(string: self.path).standardizingPath)
++    #endif
+   }
+ 
+   /// De-normalizes the path, by replacing the current user home directory with "~".
+@@ -246,7 +258,12 @@ extension Path {
+   /// - Returns: all path components
+   ///
+   public var components: [String] {
++    #if os(Windows)
++    let parsed = WindowsPaths.parse(path)
++    return (parsed.root.isEmpty ? [] : [parsed.root]) + parsed.parts
++    #else
+     return NSString(string: path).pathComponents
++    #endif
+   }
+ 
+   /// The file extension behind the last dot of the last component.
+@@ -587,6 +604,9 @@ extension Path {
+ 
+ extension Path {
+   public static func glob(_ pattern: String) -> [Path] {
++    #if os(Windows)
++    return WindowsPaths.glob(pattern)
++    #else
+     var gt = glob_t()
+     guard let cPattern = strdup(pattern) else {
+       fatalError("strdup returned null: Likely out of memory")
+@@ -614,6 +634,7 @@ extension Path {
+ 
+     // GLOB_NOMATCH
+     return []
++    #endif
+   }
+ 
+   public func glob(_ pattern: String) -> [Path] {
+@@ -621,6 +642,9 @@ extension Path {
+   }
+ 
+   public func match(_ pattern: String) -> Bool {
++    #if os(Windows)
++    return WindowsPaths.matches(path, pattern: pattern)
++    #else
+     guard let cPattern = strdup(pattern),
+           let cPath = strdup(path) else {
+       fatalError("strdup returned null: Likely out of memory")
+@@ -630,6 +654,7 @@ extension Path {
+       free(cPath)
+     }
+     return fnmatch(cPattern, cPath, 0) == 0
++    #endif
+   }
+ }
+ 
+@@ -765,6 +790,10 @@ public func +(lhs: Path, rhs: String) -> Path {
+ 
+ /// Appends a String fragment to another String to produce a new Path
+ internal func +(lhs: String, rhs: String) -> Path {
++  #if os(Windows)
++  if Path(rhs).isAbsolute { return Path(rhs).normalize() }
++  return Path(WindowsPaths.normalize(lhs + "/" + rhs))
++  #else
+   if rhs.hasPrefix(Path.separator) {
+     // Absolute paths replace relative paths
+     return Path(rhs)
+@@ -803,6 +832,7 @@ internal func +(lhs: String, rhs: String) -> Path {
+ 
+     return Path(components: lSlice + rSlice)
+   }
++  #endif
+ }
+ 
+ extension Array {
+diff --git a/Sources/WindowsPaths.swift b/Sources/WindowsPaths.swift
+new file mode 100644
+index 0000000..5ed60a4
+--- /dev/null
++++ b/Sources/WindowsPaths.swift
+@@ -0,0 +1,119 @@
++#if os(Windows)
++import Foundation
++
++// PathKit's Darwin/glibc glob and fnmatch APIs have no Windows CRT equivalent.
++internal enum WindowsPaths {
++  static func parse(_ input: String) -> (root: String, parts: [String]) {
++    let path = input.replacingOccurrences(of: "\\", with: "/")
++    var parts = path.split(separator: "/").map(String.init)
++    if path.hasPrefix("//"), parts.count >= 2 {
++      let root: String = "//" + parts.removeFirst() + "/" + parts.removeFirst()
++      return (root, parts)
++    }
++    if path.count >= 3 {
++      let characters = Array(path)
++      if characters[1] == ":", characters[2] == "/" {
++        return (parts.removeFirst() + "/", parts)
++      }
++    }
++    return (path.hasPrefix("/") ? "/" : "", parts)
++  }
++
++  static func normalize(_ input: String) -> String {
++    let expanded = (input as NSString).expandingTildeInPath
++    let parsed = parse(expanded)
++    var parts: [String] = []
++    for part in parsed.parts {
++      if part == "." { continue }
++      if part == ".." {
++        if let last = parts.last, last != ".." { parts.removeLast() }
++        else if parsed.root.isEmpty { parts.append(part) }
++      } else { parts.append(part) }
++    }
++    if parts.isEmpty { return parsed.root.isEmpty ? "." : parsed.root }
++    let separator = parsed.root.isEmpty || parsed.root.hasSuffix("/") ? "" : "/"
++    return parsed.root + separator + parts.joined(separator: "/")
++  }
++
++  static func matches(_ value: String, pattern: String, caseSensitive: Bool = true) -> Bool {
++    let characters = Array(pattern)
++    var expression = "\\A"
++    var index = 0
++    while index < characters.count {
++      let character = characters[index]
++      if character == "*" { expression += ".*" }
++      else if character == "?" { expression += "." }
++      else if character == "[" {
++        var end = index + 1
++        if end < characters.count && (characters[end] == "!" || characters[end] == "^") { end += 1 }
++        if end < characters.count && characters[end] == "]" { end += 1 }
++        while end < characters.count && characters[end] != "]" { end += 1 }
++        if end < characters.count {
++          var content = String(characters[(index + 1)..<end])
++          if content.hasPrefix("!") { content = "^" + content.dropFirst() }
++          expression += "[" + content + "]"
++          index = end
++        } else { expression += "\\[" }
++      } else { expression += NSRegularExpression.escapedPattern(for: String(character)) }
++      index += 1
++    }
++    expression += "\\z"
++    let options: NSRegularExpression.Options = caseSensitive ? [] : [.caseInsensitive]
++    guard let regex = try? NSRegularExpression(pattern: expression, options: options) else { return false }
++    return regex.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) != nil
++  }
++
++  private static func expandBraces(_ pattern: String, depth: Int = 0) -> [String] {
++    guard depth < 16 else { return [] }
++    let characters = Array(pattern)
++    guard let start = characters.firstIndex(of: "{") else { return [pattern] }
++    var level = 0
++    var pieces: [String] = []
++    var pieceStart = start + 1
++    for index in (start + 1)..<characters.count {
++      if characters[index] == "{" { level += 1 }
++      else if characters[index] == "}", level > 0 { level -= 1 }
++      else if (characters[index] == "," || characters[index] == "}") && level == 0 {
++        pieces.append(String(characters[pieceStart..<index]))
++        pieceStart = index + 1
++        if characters[index] == "}" {
++          guard pieces.count > 1 else { return [pattern] }
++          let prefix = String(characters[..<start])
++          let suffix = String(characters[(index + 1)...])
++          let expanded = pieces.flatMap { expandBraces(prefix + $0 + suffix, depth: depth + 1) }
++          return expanded.count <= 4096 ? expanded : []
++        }
++      }
++    }
++    return [pattern]
++  }
++
++  static func glob(_ input: String) -> [Path] {
++    guard !input.isEmpty else { return [] }
++    var result: [Path] = []
++    let pattern = (input.replacingOccurrences(of: "\\", with: "/") as NSString).expandingTildeInPath
++    for variant in expandBraces(pattern) {
++      let parsed = parse(variant)
++      var candidates = [Path(parsed.root.isEmpty ? "." : parsed.root)]
++      for part in parsed.parts {
++        if part.contains("*") || part.contains("?") || part.contains("[") {
++          candidates = candidates.flatMap { parent -> [Path] in
++            let sensitive = DefaultFileSystemInfo().isFSCaseSensitiveAt(path: parent)
++            return ((try? parent.children()) ?? []).filter { child in
++              (!child.lastComponent.hasPrefix(".") || part.hasPrefix(".")) &&
++                matches(child.lastComponent, pattern: part, caseSensitive: sensitive)
++            }
++          }
++        } else {
++          candidates = candidates.map { $0 + part }.filter { $0.exists }
++        }
++      }
++      if variant.hasSuffix("/") { candidates = candidates.filter { $0.isDirectory } }
++      result += candidates.map { candidate in
++        candidate.isDirectory && !candidate.string.hasSuffix("/") ? Path(candidate.string + "/") : candidate
++      }
++    }
++    return result.sorted()
++  }
++}
++#endif
