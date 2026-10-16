@@ -80,7 +80,9 @@ class CLITests(unittest.TestCase):
             (framework / 'Headers').symlink_to('Versions/Current/Headers', target_is_directory=True)
         env = dict(os.environ, XTOOL_WINDOWS_TOOLSET=str(tools.parent), XTOOL_WINDOWS_MACROS=str(macros))
         result = self.invoke('sdk', 'build', str(app), str(self.root / 'output'), env=env)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        output_root = self.root / 'output'
+        snapshot = '\n'.join(str(p.relative_to(self.root)) for p in output_root.rglob('*')) if output_root.exists() else '(not created)'
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr + '\nSDK output tree:\n' + snapshot)
         output = self.root / 'output/darwin.xtoolsdk'
         info = json.loads((output / 'info.json').read_text())
         self.assertIn('x86_64-unknown-windows-msvc', info['artifacts']['darwin']['variants'][0]['supportedTriples'])

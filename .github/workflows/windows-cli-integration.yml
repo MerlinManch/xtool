@@ -1,7 +1,7 @@
 name: Native Windows CLI integration
 on:
   push:
-    paths: ['.github/workflows/windows-cli-integration.yml']
+    paths: ['Windows/cli-tests/**', 'Windows/tests/FileOperationsSmoke.swift', 'Windows/test-file-operations.ps1', 'Sources/XUtils/WindowsFileOperations.swift', '.github/workflows/windows-cli-integration.yml']
   workflow_dispatch:
     inputs:
       diagnostic_run:

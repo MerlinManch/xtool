@@ -17,6 +17,18 @@ import Foundation
         let source = root.appendingPathComponent("source")
         let headers = source.appendingPathComponent("Versions/A/Headers")
         try manager.createDirectory(at: headers, withIntermediateDirectories: true)
+        let nativeSource = source.path.replacingOccurrences(of: "/", with: "\\")
+        var isDirectory: ObjCBool = false
+        try require(manager.fileExists(atPath: nativeSource, isDirectory: &isDirectory) && isDirectory.boolValue,
+                    "Native Windows input directory detection failed")
+        let rawOutput = root.path.replacingOccurrences(of: "/", with: "\\") + "\\raw-output"
+        let output = URL(fileURLWithPath: rawOutput, isDirectory: true).appending(path: "darwin.xtoolsdk")
+        print("Raw Windows SDK output URL:", output.absoluteString, "path:", output.path)
+        do {
+            try manager.createDirectory(at: output, withIntermediateDirectories: true)
+            print("Raw Windows SDK output directory succeeded")
+        } catch { print("Raw Windows SDK output directory diagnostic:", error) }
+        print("Native executable URL:", Bundle.main.executableURL?.absoluteString ?? "missing")
         let contents = Data("native SDK header ü 🔐".utf8)
         try contents.write(to: headers.appendingPathComponent("example.h"))
         try manager.createSymbolicLink(atPath: source.appendingPathComponent("Versions/Current").path,
