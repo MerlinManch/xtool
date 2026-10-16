@@ -13,7 +13,7 @@ index ce7321d..f0fb369 100644
 +    dflags "--link-defaultlib-shared=false" platform="windows-ldc"
 +}
 diff --git a/src/exports.d b/src/exports.d
-index 938ffc9..a9c3b01 100644
+index 938ffc9..e4801ad 100644
 --- a/src/exports.d
 +++ b/src/exports.d
 @@ -9,7 +9,7 @@ import slf4d.default_provider;
@@ -32,71 +32,71 @@ index 938ffc9..a9c3b01 100644
 -public extern(C) int xadi_SetAndroidID(const char* identifier, uint length) {
 -    return androidInvoke!gADI.pADISetAndroidID(identifier, length);
 +export extern(C) int xadi_SetAndroidID(const char* identifier, uint length) {
-+    auto function = gADI.pADISetAndroidID;
-+    return androidInvoke!function(identifier, length);
++    auto target = gADI.pADISetAndroidID;
++    return androidInvoke!target(identifier, length);
  }
  
 -public extern(C) int xadi_SetProvisioningPath(const char* path) {
 -    return androidInvoke!gADI.pADISetProvisioningPath(path);
 +export extern(C) int xadi_SetProvisioningPath(const char* path) {
-+    auto function = gADI.pADISetProvisioningPath;
-+    return androidInvoke!function(path);
++    auto target = gADI.pADISetProvisioningPath;
++    return androidInvoke!target(path);
  }
  
 -public extern(C) int xadi_ProvisioningErase(ulong dsId) {
 -    return androidInvoke!gADI.pADIProvisioningErase(dsId);
 +export extern(C) int xadi_ProvisioningErase(ulong dsId) {
-+    auto function = gADI.pADIProvisioningErase;
-+    return androidInvoke!function(dsId);
++    auto target = gADI.pADIProvisioningErase;
++    return androidInvoke!target(dsId);
  }
  
 -public extern(C) int xadi_Synchronize(ulong dsId, ubyte* serverIntermediateMetadata, uint serverIntermediateMetadataLength, ubyte** machineIdentifier, uint* machineIdentifierLength, ubyte** synchronizationResumeMetadata, uint* synchronizationResumeMetadataLength) {
 -    return androidInvoke!gADI.pADISynchronize(dsId, serverIntermediateMetadata, serverIntermediateMetadataLength, machineIdentifier, machineIdentifierLength, synchronizationResumeMetadata, synchronizationResumeMetadataLength);
 +export extern(C) int xadi_Synchronize(ulong dsId, ubyte* serverIntermediateMetadata, uint serverIntermediateMetadataLength, ubyte** machineIdentifier, uint* machineIdentifierLength, ubyte** synchronizationResumeMetadata, uint* synchronizationResumeMetadataLength) {
-+    auto function = gADI.pADISynchronize;
-+    return androidInvoke!function(dsId, serverIntermediateMetadata, serverIntermediateMetadataLength, machineIdentifier, machineIdentifierLength, synchronizationResumeMetadata, synchronizationResumeMetadataLength);
++    auto target = gADI.pADISynchronize;
++    return androidInvoke!target(dsId, serverIntermediateMetadata, serverIntermediateMetadataLength, machineIdentifier, machineIdentifierLength, synchronizationResumeMetadata, synchronizationResumeMetadataLength);
  }
  
 -public extern(C) int xadi_ProvisioningDestroy(uint session) {
 -    return androidInvoke!gADI.pADIProvisioningDestroy(session);
 +export extern(C) int xadi_ProvisioningDestroy(uint session) {
-+    auto function = gADI.pADIProvisioningDestroy;
-+    return androidInvoke!function(session);
++    auto target = gADI.pADIProvisioningDestroy;
++    return androidInvoke!target(session);
  }
  
 -public extern(C) int xadi_ProvisioningEnd(uint session, ubyte* persistentTokenMetadata, uint persistentTokenMetadataLength, ubyte* trustKey, uint trustKeyLength) {
 -    return androidInvoke!gADI.pADIProvisioningEnd(session, persistentTokenMetadata, persistentTokenMetadataLength, trustKey, trustKeyLength);
 +export extern(C) int xadi_ProvisioningEnd(uint session, ubyte* persistentTokenMetadata, uint persistentTokenMetadataLength, ubyte* trustKey, uint trustKeyLength) {
-+    auto function = gADI.pADIProvisioningEnd;
-+    return androidInvoke!function(session, persistentTokenMetadata, persistentTokenMetadataLength, trustKey, trustKeyLength);
++    auto target = gADI.pADIProvisioningEnd;
++    return androidInvoke!target(session, persistentTokenMetadata, persistentTokenMetadataLength, trustKey, trustKeyLength);
  }
  
 -public extern(C) int xadi_ProvisioningStart(ulong dsId, ubyte* serverProvisioningIntermediateMetadata, uint serverProvisioningIntermediateMetadataLength, ubyte** clientProvisioningIntermediateMetadata, uint* clientProvisioningIntermediateMetadataLength, uint* session) {
 -    return androidInvoke!gADI.pADIProvisioningStart(dsId, serverProvisioningIntermediateMetadata, serverProvisioningIntermediateMetadataLength, clientProvisioningIntermediateMetadata, clientProvisioningIntermediateMetadataLength, session);
 +export extern(C) int xadi_ProvisioningStart(ulong dsId, ubyte* serverProvisioningIntermediateMetadata, uint serverProvisioningIntermediateMetadataLength, ubyte** clientProvisioningIntermediateMetadata, uint* clientProvisioningIntermediateMetadataLength, uint* session) {
-+    auto function = gADI.pADIProvisioningStart;
-+    return androidInvoke!function(dsId, serverProvisioningIntermediateMetadata, serverProvisioningIntermediateMetadataLength, clientProvisioningIntermediateMetadata, clientProvisioningIntermediateMetadataLength, session);
++    auto target = gADI.pADIProvisioningStart;
++    return androidInvoke!target(dsId, serverProvisioningIntermediateMetadata, serverProvisioningIntermediateMetadataLength, clientProvisioningIntermediateMetadata, clientProvisioningIntermediateMetadataLength, session);
  }
  
 -public extern(C) int xadi_GetLoginCode(ulong dsId) {
 -    return androidInvoke!gADI.pADIGetLoginCode(dsId);
 +export extern(C) int xadi_GetLoginCode(ulong dsId) {
-+    auto function = gADI.pADIGetLoginCode;
-+    return androidInvoke!function(dsId);
++    auto target = gADI.pADIGetLoginCode;
++    return androidInvoke!target(dsId);
  }
  
 -public extern(C) int xadi_Dispose(void* ptr) {
 -    return androidInvoke!gADI.pADIDispose(ptr);
 +export extern(C) int xadi_Dispose(void* ptr) {
-+    auto function = gADI.pADIDispose;
-+    return androidInvoke!function(ptr);
++    auto target = gADI.pADIDispose;
++    return androidInvoke!target(ptr);
  }
  
 -public extern(C) int xadi_OTPRequest(ulong dsId, ubyte** machineIdentifier, uint* machineIdentifierLength, ubyte** oneTimePassword, uint* oneTimePasswordLength) {
 -    return androidInvoke!gADI.pADIOTPRequest(dsId, machineIdentifier, machineIdentifierLength, oneTimePassword, oneTimePasswordLength);
 +export extern(C) int xadi_OTPRequest(ulong dsId, ubyte** machineIdentifier, uint* machineIdentifierLength, ubyte** oneTimePassword, uint* oneTimePasswordLength) {
-+    auto function = gADI.pADIOTPRequest;
-+    return androidInvoke!function(dsId, machineIdentifier, machineIdentifierLength, oneTimePassword, oneTimePasswordLength);
++    auto target = gADI.pADIOTPRequest;
++    return androidInvoke!target(dsId, machineIdentifier, machineIdentifierLength, oneTimePassword, oneTimePasswordLength);
 +}
 +
 +// Keep D exceptions inside the DLL ABI; the Swift caller can report load failure.
