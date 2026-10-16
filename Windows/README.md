@@ -64,8 +64,23 @@ with a current distribution; do not copy only `xtool.exe`. If necessary, install
 the x64 Visual C++ Redistributable from Microsoft's official site. Other exit
 codes need separate diagnosis.
 
-Enable Windows Developer Mode or symlink privileges and long paths. Use
-local NTFS storage for SDKs. The XIP extractor enables case sensitivity on each
+Enable **Windows Developer Mode on the PC** (separate from iOS Developer Mode),
+or use a process with symbolic-link privileges, and enable long paths. Open
+Windows Settings with `Start-Process "ms-settings:developers"` and search for
+Developer Mode if the page has moved. Windows 11 25H2 and later place it under
+System > Advanced > For developers. The extractor checks both file and directory
+symlink creation on the destination volume before reading/decompressing Xcode.
+Windows error 1314 means the required symbolic-link privilege is missing; the
+error explains how to enable Developer Mode or use an elevated PowerShell.
+The installer never changes Windows settings or elevates itself automatically.
+
+To check the current terminal without extracting Xcode:
+
+```powershell
+.\xtool-unxip.exe --check-symlinks "$env:TEMP"
+```
+
+The check removes its own temporary links. Use local NTFS storage for SDKs. The XIP extractor enables case sensitivity on each
 Xcode directory before writing its contents, and SDK install/update preserves it.
 This retains case-distinct headers and hardlinked manpages such as
 `circleq_init.3` and `CIRCLEQ_INIT.3`. If Windows refuses the flag change, check
@@ -134,7 +149,9 @@ Verified on native Windows:
 - Console tests verify Unicode password input and restored echo. DPAPI tests
   cover encryption, migration, corruption rejection and removal. File tests
   verify locks, hardlinks and relocated directory-link chains.
-- CLI integration creates projects, checks native BSP configuration, accepts
+- Native symlink prerequisite tests use a restricted Windows token to distinguish
+  missing symlink privileges from Developer Mode support, and verify probe cleanup
+  in long Unicode paths. CLI integration creates projects, checks native BSP configuration, accepts
   redirected UTF-8 input and builds/installs/updates/removes a synthetic SDK on
   NTFS. Source Xcode metadata remains unchanged. SDK cleanup uses native deletion
   handles with absolute long paths, without following directory symlinks or
@@ -193,4 +210,5 @@ tests also run in that environment. The assembled archive helpers must pass the
 XIP/IPA suite, including the case-distinct Xcode manpage regression, before the
 ZIP is published. The assembled CLI also removes read-only SDK trees and
 cleans an interrupted extraction before validating the next install input,
-with only Windows System32 on PATH.
+with only Windows System32 on PATH. The assembled extractor's file/directory
+symlink prerequisite check must also pass before publication.

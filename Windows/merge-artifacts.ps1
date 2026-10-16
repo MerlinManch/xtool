@@ -96,6 +96,8 @@ try {
     $env:XTOOL_CLI = Join-Path $bin 'xtool.exe'
     & python -m unittest discover -s (Join-Path $PSScriptRoot 'runtime-tests') -p test_sdk_cleanup.py -v
     if ($LASTEXITCODE -ne 0) { throw 'Assembled readonly SDK cleanup tests failed' }
+    & (Join-Path $bin 'xtool-unxip.exe') --check-symlinks $OutputRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Assembled extractor symlink prerequisite check failed' }
     # Exercise the archive helpers from the assembled distribution, including
     # Xcode's case-distinct CPIO hardlinks, before publishing this ZIP.
     $env:XTOOL_NATIVE_BIN = $bin
