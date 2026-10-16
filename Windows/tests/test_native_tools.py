@@ -103,6 +103,47 @@ class XIPTests(unittest.TestCase):
         self.assertTrue((output / 'Xcode.app/Headers').is_dir())
         self.assertEqual((output / 'Xcode.app/Headers/test.h').read_bytes(), b'header')
 
+    def test_case_distinct_hardlink_manpages(self):
+        directory = ('Xcode.app/Contents/Developer/Platforms/MacOSX.platform/'
+                     'Developer/SDKs/MacOSX.sdk/usr/share/man/man3')
+        cpio = (cpio_entry(directory + '/circleq_init.3', b'manpage', inode=2, links=2)
+                + cpio_entry(directory + '/CIRCLEQ_INIT.3', b'', inode=2, links=2)
+                + cpio_entry('TRAILER!!!', inode=0))
+        result, output = self.extract(xar(pbzx(cpio)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lower = output / directory / 'circleq_init.3'
+        upper = output / directory / 'CIRCLEQ_INIT.3'
+        self.assertEqual(lower.read_bytes(), b'manpage')
+        self.assertEqual(upper.read_bytes(), b'manpage')
+        self.assertTrue(os.path.samefile(lower, upper))
+        self.assertEqual(set(os.listdir(lower.parent)), {'circleq_init.3', 'CIRCLEQ_INIT.3'})
+
+    def test_case_distinct_directories_and_contents(self):
+        cpio = (cpio_entry('Xcode.app/Headers/Foo.h', b'uppercase', inode=2)
+                + cpio_entry('Xcode.app/headers/foo.h', b'lowercase', inode=3)
+                + cpio_entry('TRAILER!!!', inode=0))
+        result, output = self.extract(xar(pbzx(cpio)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((output / 'Xcode.app/Headers/Foo.h').read_bytes(), b'uppercase')
+        self.assertEqual((output / 'Xcode.app/headers/foo.h').read_bytes(), b'lowercase')
+        self.assertEqual(set(os.listdir(output / 'Xcode.app')), {'Headers', 'headers'})
+
+    def test_case_distinct_symbolic_link_manpages(self):
+        directory = 'Xcode.app/usr/share/man/man3'
+        cpio = (cpio_entry(directory + '/queue.3', b'manpage', inode=2)
+                + cpio_entry(directory + '/circleq_init.3', b'queue.3',
+                             mode=stat.S_IFLNK | 0o777, inode=3)
+                + cpio_entry(directory + '/CIRCLEQ_INIT.3', b'queue.3',
+                             mode=stat.S_IFLNK | 0o777, inode=4)
+                + cpio_entry('TRAILER!!!', inode=0))
+        result, output = self.extract(xar(pbzx(cpio)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for name in ('circleq_init.3', 'CIRCLEQ_INIT.3'):
+            self.assertEqual((output / directory / name).read_bytes(), b'manpage')
+            self.assertEqual(os.readlink(output / directory / name), 'queue.3')
+        self.assertEqual(set(os.listdir(output / directory)),
+                         {'circleq_init.3', 'CIRCLEQ_INIT.3', 'queue.3'})
+
     def test_exact_chunk_boundary(self):
         cpio = cpio_entry('test', b'hello') + cpio_entry('TRAILER!!!', inode=0)
         cpio += b'\0' * (1024 - len(cpio))
