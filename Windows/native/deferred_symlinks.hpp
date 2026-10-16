@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 // CPIO/Unix ZIP do not record whether a symlink targets a file or directory.

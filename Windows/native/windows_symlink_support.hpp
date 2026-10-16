@@ -5,6 +5,7 @@
 #endif
 #include <windows.h>
 #include <filesystem>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 
