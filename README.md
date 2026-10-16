@@ -14,10 +14,10 @@ xtool is a cross-platform (Linux/WSL/macOS) tool that replicates Xcode functiona
 
 ## Native Windows development
 
-An experimental native Windows implementation and build scripts are available in
-[Windows/README.md](Windows/README.md). Full Windows CLI/device validation and the
-native device-library distribution are still required; this is not a verified
-complete Windows release.
+The native Windows implementation and build instructions are available in
+[Windows/README.md](Windows/README.md). Native CLI/device libraries, local Anisette
+and Windows SDK host tools have dedicated CI workflows. See that document for
+verified checks and remaining end-to-end validation.
 
 ## Getting Started
 

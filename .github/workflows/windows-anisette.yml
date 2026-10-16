@@ -1,7 +1,7 @@
 name: Native Windows Anisette
 on:
   push:
-    paths: ['Windows/build-anisette.ps1', 'Windows/patches/xadi.patch', 'Windows/anisette-tests/**', '.github/workflows/windows-anisette.yml']
+    paths: ['Windows/build-anisette.ps1', 'Windows/patches/xadi.patch', 'Windows/anisette-tests/**', 'Sources/CWindowsADI/**', '.github/workflows/windows-anisette.yml']
   workflow_dispatch:
 concurrency:
   group: windows-anisette-${{ github.ref }}
@@ -17,6 +17,18 @@ jobs:
       - name: Build local Anisette runtime
         shell: pwsh
         run: ./Windows/build-anisette.ps1
+      - name: Compile and test the C-to-D loader bridge
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -property installationPath
+          Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          cl /nologo /W4 /WX /ISources/CWindowsADI/include Sources/CWindowsADI/WindowsADI.c Windows/anisette-tests/bridge.c /FeWindows/dist/bin/xtool-test-anisette.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Anisette C bridge compilation failed' }
+          ./Windows/dist/bin/xtool-test-anisette.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Anisette C bridge test failed' }
+          Remove-Item Windows/dist/bin/xtool-test-anisette.exe
       - name: Test local Anisette DLL and Apple library initialization
         shell: pwsh
         run: |

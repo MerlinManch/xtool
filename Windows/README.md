@@ -1,130 +1,117 @@
-# Native Windows port — implementation and validation status
+# Native Windows port
 
-This branch adds a native Windows implementation without WSL or a Linux subprocess.
-**It is not yet a verified complete Windows release.** No full Swift build or real
-Windows/iPhone integration run was possible in the implementation environment.
-The native device library dependency prefix is not bundled or built by this branch.
+Native Windows implementation using Swift, MSVC, Win32 and native C/C++/D
+libraries. WSL is not used. The complete CLI and SDK toolchain are being validated
+on Windows CI; device/account integration also requires an Apple account, Xcode
+SDK and an iPhone. This document distinguishes implementation from test coverage.
 
-Base: MerlinManch/xtool, commit `316a11e`.
+## Build
 
-## Implemented
-
-| Area | Native Windows implementation | Verification |
-| --- | --- | --- |
-| Process execution | Enable swift-subprocess on Windows; handle Windows exit status | Swift compilation pending |
-| Console/passwords | Win32 console modes; restore echo; UTF-8; redirected line input | Windows integration pending |
-| Ctrl+C/Ctrl+Break | Win32 control handler plus cooperative task cancellation | C tests supplied; Windows execution pending |
-| Temporary directory coordination | Nonblocking LockFileEx and close-before-delete cleanup | C/Swift tests supplied; Windows execution pending |
-| IPA creation/extraction | libarchive helper, symlinks and hidden files; reconstruct Mach-O executable permissions on NTFS | Linux native helper tests pass |
-| Xcode.xip | Streaming XAR → PBZX/XZ → CPIO extraction with bounded memory | Linux native helper tests pass |
-| Linker | Native executable replaces the shell trampoline; arguments, UTF-8/UTF-16 response files and exit codes | Linux native helper tests pass |
-| Darwin SDK | Windows triples, .exe tools, Windows LLVM/macros resources, host architecture validation | Full SDK build pending |
-| IDE/BSP | Native xtool.exe invocation; Windows PATH separator | Swift test supplied; execution pending |
-| HTTP | FoundationNetworking imports and Security-only TLS API guard | Windows HTTPS/WebSocket tests pending |
-| Signing dependencies | Pinned xtool-core and zsign patches for Windows build issues and directory enumeration | Windows signing integration pending |
-| Device/Developer Services commands | Existing command implementations retained | Authentication, provisioning, USB, install, launch, uninstall pending |
-
-The Windows ADI selection uses the existing Omnisette provider. Native local XADI
-is not ported; this is a remaining functional difference from Linux/macOS. The
-original Linux/macOS XADI dependency remains platform-limited.
-
-## Prerequisites
-
-- Native Windows 10/11, PowerShell 7, Git, CMake and Visual Studio 2022 C++ build tools.
-- A compatible native Swift toolchain (package minimum 6.2; SwiftBuild/BSP requires
-  6.4 in the existing code). The macro package's own toolchain requirements apply.
-- A Visual Studio developer PowerShell session, including `mt.exe` on PATH.
-- vcpkg; pass its root to the build script.
-- Developer Mode / symlink privileges for SDK and app framework links. Use NTFS,
-  enable long paths, and use a case-sensitive SDK directory where SDK contents
-  require distinct names differing only by case. No lossy symlink fallback exists.
-- Apple Mobile Device Support and a running Apple Mobile Device Service for USB.
-  Trust the computer on the device. Device-specific Developer Mode requirements
-  from upstream xtool continue to apply.
-
-## Build the native helpers
+Use Windows x64, PowerShell 7, Visual Studio 2022 C++ tools and Windows SDK,
+Git, CMake, Python 3, Swift 6.4.1, LDC 1.43.0 with Dub, and vcpkg. Run from a
+Visual Studio developer PowerShell session so `mt.exe` and MSVC are available.
 
 ```powershell
-./Windows/build.ps1 -HelpersOnly -VcpkgRoot C:/src/vcpkg
-$env:XTOOL_NATIVE_BIN = "$pwd/Windows/dist/bin"
-$env:XTOOL_NATIVE_TEST_CHILD = "$pwd/Windows/build/Release/xtool-test-child.exe"
-python -m unittest discover -s Windows/tests -v
-./Windows/build/Release/xtool-test-support.exe
+./Windows/build-all.ps1 -VcpkgRoot C:/src/vcpkg
 ```
 
-The helper workflow `.github/workflows/windows-native.yml` runs these checks on
-Windows and uploads helper executables. It does **not** build/test the full Swift
-CLI and has not been dispatched from the implementation environment.
+This builds and tests the CLI, archive/linker helpers, device libraries, local
+Anisette DLL, LLVM Darwin tools and macro server, then creates
+`Windows/xtool-windows-x64.zip`. LLVM is a substantial source build. Sources and
+native dependencies are pinned; vcpkg uses a detached worktree at the recorded
+baseline instead of changing an existing vcpkg checkout. Build output is in
+`Windows/dist`. `-SkipTests` skips the test phase.
 
-## Build the CLI
-
-Provide a prefix containing **native MSVC/UCRT-compatible** dependencies, with:
-
-- `include/`: OpenSSL, libplist, libusbmuxd, libimobiledevice-glue and libimobiledevice headers;
-- `lib/`: `libssl.lib`, `libcrypto.lib`, `plist-2.0.lib`, `usbmuxd-2.0.lib`,
-  `imobiledevice-glue-1.0.lib`, `imobiledevice-1.0.lib`;
-- `bin/`: their runtime DLLs and all transitive DLL dependencies.
-
-The versions must expose the APIs used by SwiftyMobileDevice 1.7.0. Alternate
-library names can be normalized by copying their import libraries under the names
-above. Do not substitute MinGW libraries using a different CRT: allocated memory
-crosses the Swift/C library boundary. Creating, supplying and validating this
-native device-library distribution remains required to finish the port.
+Individual components can be built separately:
 
 ```powershell
-./Windows/build.ps1 -VcpkgRoot C:/src/vcpkg -NativeDependencyRoot C:/src/ios-native
-./Windows/dist/bin/xtool.exe --help
-```
-
-The build script checks out the exact upstream revisions and applies the reviewed
-patches from `Windows/patches`. It does not edit SwiftPM checkout caches or remote
-branches. Runtime prerequisites from the installed Swift toolchain must be on PATH.
-The executable manifest enables UTF-8 for the legacy C/Win32 signing paths.
-
-## Build the SDK host tools
-
-```powershell
+./Windows/build.ps1 -RunTests -VcpkgRoot C:/src/vcpkg
+./Windows/build-anisette.ps1
 ./Windows/build-toolset.ps1
-./Windows/dist/bin/xtool.exe sdk install C:/Downloads/Xcode.xip
+./Windows/package.ps1
 ```
 
-The script builds the same pinned LLVM fork used by darwin-tools-linux-llvm 1.1.0
-and OpenAppleMacros 1.3.0 as native Windows programs. This is a substantial LLVM
-source build. Run it for the host architecture; ARM64 output is not validated.
-The native builds themselves remain unverified here.
+`build.ps1 -HelpersOnly` builds the native helper executables and device libraries.
+An existing MSVC/UCRT native dependency prefix can be selected using
+`-NativeDependencyRoot`; the default is the pinned vcpkg build. Import libraries
+must include `libssl`, `libcrypto`, `plist-2.0`, `usbmuxd-2.0`,
+`imobiledevice-glue-1.0` and `imobiledevice-1.0`. Do not substitute MinGW CRT
+libraries. The scripts do not modify SwiftPM checkout caches.
 
-Alternatively provide `XTOOL_WINDOWS_TOOLSET` (directory with `bin/ld64.lld.exe`,
-`bin/llvm-libtool-darwin.exe`, `bin/dsymutil.exe`, and required DLLs), and
-`XTOOL_WINDOWS_MACROS` (directory containing `OpenAppleMacrosServer.exe` and its
-DLLs). By default the installer uses `windows-toolset` and `windows-macros`
-subdirectories beside xtool.exe. ELF/Linux executables are rejected.
+## Run
 
-Rebuild the SDK for Windows. A Linux-built SDK contains Linux tools and should not
-be reused as a Windows host SDK. SDK metadata uses a Windows-specific version.
-The XIP helper extracts contents; it does not authenticate Apple's XIP signature.
+Keep all files from the distribution together and add its `bin` directory to
+PATH. A compatible installed Swift toolchain is required for Swift compilation
+and supplies the Swift runtime DLLs; Visual C++ runtime prerequisites also apply.
+The executable manifest enables UTF-8 and long paths.
 
-## Validation still required for completion
+```powershell
+xtool.exe --help
+xtool.exe sdk install C:/Downloads/Xcode.xip
+xtool.exe auth login
+xtool.exe devices
+```
 
-1. Build the entire CLI and run `swift test` with a native Windows Swift toolchain
-   and the dependency prefix; resolve any remaining transitive platform errors.
-2. Run the helper workflow on Windows, including UTF-8, symlinks, file locks and
-   argument forwarding. Run the repository's `make lint` in a supported Swift host.
-3. Build/install/update/remove an SDK from real Xcode.xip in normal and slim modes;
-   compile all examples, including SwiftUI macros and the SwiftBuild/BSP path.
-4. Exercise Apple ID/2FA and ASC key authentication; teams, certificates, devices,
-   identifiers, profiles and app groups with real service credentials.
-5. Test signing and USB/network deployment, launch/debug and uninstall on real iOS
-   devices. Validate the installed app and extension executable permissions.
-6. Implement/validate a local Windows ADI provider for parity with local XADI.
+Enable Windows Developer Mode or symlink privileges and long paths. Use NTFS and
+a case-sensitive SDK directory where Xcode SDK contents require names differing
+only by case. USB requires Apple Mobile Device Support and a running Apple Mobile
+Device Service. Trust this computer on the iPhone and enable iOS Developer Mode
+where required by the upstream instructions.
 
-## Checks performed in this environment
+Build a Windows-host SDK from Xcode.xip or Xcode.app. A Linux-host SDK contains
+ELF executables and cannot be reused. Native tool resources default to
+`windows-toolset` and `windows-macros` beside xtool.exe. Override these with
+`XTOOL_WINDOWS_TOOLSET` and `XTOOL_WINDOWS_MACROS`. The installer checks PE headers
+and host architecture. The XIP helper extracts the archive; it does not verify
+Apple's XIP signature. Apple does not supply an iOS Simulator runtime for Windows;
+macOS simulator commands retain their upstream platform restrictions.
 
-- C++17 compilation of linker, XIP and ZIP helper with GCC `-Wall -Wextra -Werror`.
-- 15 functional tests passed on Linux against native libarchive/liblzma: argument
-  forwarding/exit status, raw/compressed PBZX, exact chunk boundaries, Unicode,
-  hard/symbolic links, IPA round trip and executable modes, invalid/truncated data,
-  path traversal and symlink escapes.
-- `swift build` / `swift test`: blocked (`swift: command not found`).
-- `make lint`: attempted; SwiftLint could not load `libsourcekitdInProc.so` because
-  there is no installed Swift toolchain.
-- No Windows build, real Xcode SDK build, Apple service login or iPhone test run.
+## Implementation
+
+| Area | Windows implementation |
+| --- | --- |
+| Processes | swift-subprocess, `.exe` resolution, PATH separator and Windows exit status |
+| Console | Win32 Unicode input, password echo restoration, UTF-8 redirected input |
+| Cancellation | Ctrl+C/Ctrl+Break control handler and cooperative task cancellation |
+| Temporary files | Nonblocking LockFileEx coordination and close-before-delete cleanup |
+| Credentials | Per-user Windows DPAPI protection and plaintext-storage migration |
+| IPA | Native libarchive helper, hidden files, links, Mach-O executable-mode reconstruction |
+| Xcode.xip | Streaming XAR/PBZX/XZ/CPIO extraction with bounded chunk memory |
+| Darwin linking | Native response-file trampoline, LLVM linker and Apple librarian |
+| SDK | Windows triples and native LLVM/macros tools, `.exe` tool paths |
+| IDE/BSP | Native executable invocation and Windows environment handling |
+| Signing | Native OpenSSL/zsign and patched Windows directory enumeration |
+| Device operations | Native libplist, usbmuxd, libimobiledevice and SwiftyMobileDevice |
+| Local Anisette | Native XADIBinary.dll, Windows/SysV ABI thunk, local Apple-library initialization |
+| Developer Services | Shared authentication, provisioning, teams, certificates, identifiers, profiles and app groups |
+
+## Validation
+
+Three independent Windows workflows build/test the CLI and native dependencies,
+the Anisette runtime, and the SDK host tools. Separating them avoids restarting
+the long LLVM build when a CLI or Anisette fix changes.
+
+Verified so far:
+
+- Native Windows Anisette DLL builds and passes export/error-boundary tests.
+  The public Apple Music APK's x86_64 libraries initialize successfully; Android
+  ID, provisioning directory and unprovisioned-login calls cross the ABI boundary.
+- 15 native helper tests pass on Linux: response-file forwarding, exit status,
+  raw/compressed PBZX, Unicode, hard/symbolic links, executable modes, malformed
+  archives, traversal and symlink escapes. Windows execution is in CI.
+- Windows PathKit branches pass semantic compilation and functional normalization/
+  glob checks using Swift 6.4.1; Windows integration tests are included.
+- Windows-target syntax parsing passes for 131 non-generated Swift source files.
+- Repository SwiftLint completes with zero violations.
+
+Pending Windows CI results and integration coverage:
+
+- Complete CLI build and `swift test`, native helper and Win32 primitive tests.
+- LLVM and macro server build, real Xcode SDK install/update/remove and example
+  compilation including SwiftUI macros and SwiftBuild/BSP.
+- Apple ID/2FA, ASC keys, account provisioning and real-device USB/network
+  signing/install/launch/uninstall. These require external credentials/hardware.
+- ARM64 support is not release-validated; the complete build targets x64 and the
+  local Anisette implementation currently uses Apple's x86_64 libraries.
+
+A passing helper or Anisette build alone is not evidence of full feature parity.
