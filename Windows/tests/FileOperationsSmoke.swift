@@ -41,6 +41,27 @@ import Foundation
         try handle.seek(toOffset: 4)
         try require(try handle.readToEnd() == contents.dropFirst(4), "Native FileHandle seek failed")
         try handle.close()
+        let caseSource = root.appendingPathComponent("case-source")
+        try manager.createDirectory(at: caseSource, withIntermediateDirectories: false)
+        try manager.setWindowsDirectoryCaseSensitive(at: caseSource)
+        for (directory, text) in [("Headers", "uppercase"), ("headers", "lowercase")] {
+            let nested = caseSource.appendingPathComponent(directory)
+            try manager.createWindowsDirectory(at: nested, preservingCaseOf: caseSource)
+            try Data(text.utf8).write(to: nested.appendingPathComponent("example.h"))
+        }
+        try Data("upper file".utf8).write(to: caseSource.appendingPathComponent("A.h"))
+        try Data("lower file".utf8).write(to: caseSource.appendingPathComponent("a.h"))
+        let caseCopy = root.appendingPathComponent("case-copy")
+        try manager.copyWindowsTree(at: caseSource, to: caseCopy)
+        try manager.removeItem(at: caseSource)
+        for (path, text) in [
+            ("Headers/example.h", "uppercase"), ("headers/example.h", "lowercase"),
+            ("A.h", "upper file"), ("a.h", "lower file"),
+        ] {
+            try require(try Data(contentsOf: caseCopy.appendingPathComponent(path)) == Data(text.utf8),
+                        "Case-distinct SDK copy lost or overwrote " + path)
+        }
+        print("NTFS case-sensitive directories and case-distinct SDK copies passed")
         // Foundation's directory-copy behavior is logged separately; the SDK
         // uses our explicit Windows tree traversal to retain directory links.
         do {

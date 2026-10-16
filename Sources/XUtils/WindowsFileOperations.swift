@@ -42,12 +42,57 @@ extension FileManager {
         guard success else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError())) }
     }
 
+    private func windowsDirectoryHandle(at url: URL, access: DWORD) throws -> HANDLE {
+        let handle = url.path.withCString(encodedAs: UTF16.self) {
+            CreateFileW($0, access, DWORD(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE),
+                        nil, DWORD(OPEN_EXISTING),
+                        DWORD(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT), nil)
+        }
+        guard let handle, handle != INVALID_HANDLE_VALUE else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()),
+                          userInfo: [NSFilePathErrorKey: url.path])
+        }
+        return handle
+    }
+
+    private func windowsDirectoryIsCaseSensitive(at url: URL) throws -> Bool {
+        let handle = try windowsDirectoryHandle(at: url, access: DWORD(FILE_READ_ATTRIBUTES))
+        defer { CloseHandle(handle) }
+        // FILE_CASE_SENSITIVE_INFORMATION contains one ULONG Flags field.
+        var flags: DWORD = 0
+        guard GetFileInformationByHandleEx(handle, FileCaseSensitiveInfo, &flags, DWORD(MemoryLayout<DWORD>.size)) else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()),
+                          userInfo: [NSFilePathErrorKey: url.path])
+        }
+        return flags & 1 != 0
+    }
+
+    package func setWindowsDirectoryCaseSensitive(at url: URL) throws {
+        let handle = try windowsDirectoryHandle(at: url, access: DWORD(FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES))
+        defer { CloseHandle(handle) }
+        var flags: DWORD = 1 // FILE_CS_FLAG_CASE_SENSITIVE_DIR
+        guard SetFileInformationByHandle(handle, FileCaseSensitiveInfo, &flags, DWORD(MemoryLayout<DWORD>.size)) else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()), userInfo: [
+                NSFilePathErrorKey: url.path,
+                NSLocalizedDescriptionKey: "Could not enable NTFS case sensitivity for '\(url.path)'. "
+                    + "Check directory permissions; enabling the flag may require an elevated terminal.",
+            ])
+        }
+    }
+
+    package func createWindowsDirectory(at destination: URL, preservingCaseOf source: URL) throws {
+        try createDirectory(at: destination, withIntermediateDirectories: false)
+        if try windowsDirectoryIsCaseSensitive(at: source) {
+            try setWindowsDirectoryCaseSensitive(at: destination)
+        }
+    }
+
     package func copyWindowsTree(at source: URL, to destination: URL) throws {
         let attributes = try windowsAttributes(at: source)
         if attributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
             try copyWindowsSymbolicLink(at: source, to: destination)
         } else if attributes & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0 {
-            try createDirectory(at: destination, withIntermediateDirectories: false)
+            try createWindowsDirectory(at: destination, preservingCaseOf: source)
             for child in try contentsOfDirectory(at: source, includingPropertiesForKeys: nil) {
                 try copyWindowsTree(at: child, to: destination.appendingPathComponent(child.lastPathComponent))
             }

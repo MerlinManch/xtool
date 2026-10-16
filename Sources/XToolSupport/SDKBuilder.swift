@@ -93,7 +93,7 @@ struct SDKBuilder {
 
     static var currentSDKVersion: String {
         #if os(Windows)
-        "epoch=\(sdkEpoch),darwinTools=windows-native-1,oam=\(oamVersion)"
+        "epoch=\(sdkEpoch),darwinTools=windows-native-2,oam=\(oamVersion)"
         #else
         "epoch=\(sdkEpoch),darwinTools=\(darwinToolsVersion),oam=\(oamVersion)"
         #endif
@@ -508,7 +508,11 @@ struct SDKBuilder {
                     could not read '\(sourceFile.path)'
                     """)
                 }
+                #if os(Windows)
+                try FileManager.default.copyWindowsTree(at: sourceFile, to: expectedFile)
+                #else
                 try await FileManager.default.copyItem(at: sourceFile, to: expectedFile, preserveOwner: false)
+                #endif
             }
             appDir = expectedAppDir
             wanted = nil
@@ -516,7 +520,13 @@ struct SDKBuilder {
         }
         try Task.checkCancellation()
 
+        #if os(Windows)
+        try FileManager.default.createWindowsDirectory(
+            at: dev, preservingCaseOf: appDir.appendingPathComponent("Contents/Developer")
+        )
+        #else
         try FileManager.default.createDirectory(at: dev, withIntermediateDirectories: false)
+        #endif
 
         var toDoDirs: [String] = ["Contents/Developer"]
         var count = 0
@@ -557,7 +567,11 @@ struct SDKBuilder {
                 #endif
                 if try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
                     toDoDirs.append(path)
+                    #if os(Windows)
+                    try FileManager.default.createWindowsDirectory(at: dest, preservingCaseOf: child)
+                    #else
                     try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: false)
+                    #endif
                 } else if mode.usesHardLinks {
                     // Installed SDKs retain Xcode.app developer dir, so avoid storing their developer files twice.
                     #if os(Windows)

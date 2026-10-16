@@ -77,6 +77,10 @@ class CLITests(unittest.TestCase):
                 (target / 'marker').write_text(framework)
             framework = sdk / 'Example.framework'
             (framework / 'Versions/A/Headers').mkdir(parents=True)
+            subprocess.run(['fsutil.exe', 'file', 'setCaseSensitiveInfo',
+                            str(framework / 'Versions/A/Headers'), 'enable'],
+                           capture_output=True, check=True)
+            (framework / 'Versions/A/Headers/Example.h').write_text('uppercase header')
             (framework / 'Versions/A/Headers/example.h').write_text('header')
             (framework / 'Versions/Current').symlink_to(Path('A'), target_is_directory=True)
             (framework / 'Headers').symlink_to(Path('Versions/Current/Headers'), target_is_directory=True)
@@ -98,6 +102,7 @@ class CLITests(unittest.TestCase):
             self.assertEqual((frameworks / 'Testing.framework/marker').read_text(), 'Testing')
             self.assertTrue((frameworks / 'Example.framework/Headers').is_symlink())
             self.assertEqual((frameworks / 'Example.framework/Headers/example.h').read_text(), 'header')
+            self.assertEqual((frameworks / 'Example.framework/Headers/Example.h').read_text(), 'uppercase header')
             self.assertTrue((base / 'Developer/usr/bin/swift-plugin-server.exe').is_file())
             self.assertEqual((base / 'Developer/usr/bin/companion.dll').read_bytes(), b'companion resource')
         self.assertTrue((output / 'Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/SwiftUIMacros.dll').exists())
@@ -113,6 +118,9 @@ class CLITests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             marker = installed / 'Developer/Platforms/iPhoneOS.platform/Developer/Library/Frameworks/Testing.framework/marker'
             self.assertEqual(marker.read_text(), 'Testing')
+            header_root = installed / 'Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/Example.framework/Headers'
+            self.assertEqual((header_root / 'example.h').read_text(), 'header')
+            self.assertEqual((header_root / 'Example.h').read_text(), 'uppercase header')
         result = self.invoke('sdk', 'remove', env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse(installed.exists())
