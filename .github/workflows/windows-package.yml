@@ -1,0 +1,104 @@
+name: Native Windows distribution
+on:
+  push:
+    paths: ['.github/workflows/windows-package.yml', 'Windows/merge-artifacts.ps1', 'Windows/collect-anisette-licenses.ps1', 'Windows/package.ps1']
+  workflow_run:
+    workflows: ['Native Windows port']
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  assemble:
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository) }}
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Select compatible successful native builds
+        id: components
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const repo = context.repo;
+            const completed = context.payload.workflow_run;
+            const sourceRef = completed?.head_sha ?? context.sha;
+            const branch = completed?.head_branch ?? context.ref.replace('refs/heads/', '');
+            const specifications = {
+              cli: ['windows-native.yml', 'xtool-windows-native-x64'],
+              sdk: ['windows-sdk-tools.yml', 'xtool-windows-sdk-tools-x64'],
+              anisette: ['windows-anisette.yml', 'xtool-windows-anisette-x64']
+            };
+            const records = {};
+            for (const [name, [workflow_id, artifactName]] of Object.entries(specifications)) {
+              const runs = name === 'cli' && completed
+                ? [completed]
+                : (await github.rest.actions.listWorkflowRuns({ ...repo, workflow_id, branch, status: 'success', per_page: 20 })).data.workflow_runs;
+              for (const run of runs) {
+                const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, { ...repo, run_id: run.id });
+                const artifact = artifacts.find(item => item.name === artifactName && !item.expired);
+                if (!artifact) continue;
+                records[name] = { head_sha: run.head_sha, run_id: run.id, artifact_id: artifact.id, digest: artifact.digest };
+                core.setOutput(name, run.id);
+                break;
+              }
+              if (!records[name]) throw new Error(`No successful, unexpired ${name} build for ${branch}`);
+            }
+            async function contentIdentity(ref, path) {
+              const { data } = await github.rest.repos.getContent({ ...repo, ref, path });
+              return Array.isArray(data)
+                ? JSON.stringify(data.map(item => [item.name, item.sha]).sort((a, b) => a[0].localeCompare(b[0])))
+                : data.sha;
+            }
+            async function checkPaths(left, right, paths) {
+              for (const path of paths) {
+                const [a, b] = await Promise.all([contentIdentity(left, path), contentIdentity(right, path)]);
+                if (a !== b) throw new Error(`Incompatible source ${path}; rebuild the corresponding native component`);
+              }
+            }
+            await checkPaths(sourceRef, records.cli.head_sha,
+              ['Sources', 'Tests', 'Package.swift', 'Windows/build.ps1', 'Windows/native', 'Windows/patches']);
+            await checkPaths(records.cli.head_sha, records.sdk.head_sha, ['Windows/build-toolset.ps1']);
+            await checkPaths(records.cli.head_sha, records.anisette.head_sha,
+              ['Windows/build-anisette.ps1', 'Windows/patches/xadi.patch', 'Sources/CWindowsADI/include/CWindowsADI.h']);
+            fs.writeFileSync('Windows/component-builds.json', JSON.stringify(records, null, 2));
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtool-windows-native-x64
+          run-id: ${{ steps.components.outputs.cli }}
+          github-token: ${{ github.token }}
+          path: Windows/package-input/cli
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtool-windows-sdk-tools-x64
+          run-id: ${{ steps.components.outputs.sdk }}
+          github-token: ${{ github.token }}
+          path: Windows/package-input/sdk
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtool-windows-anisette-x64
+          run-id: ${{ steps.components.outputs.anisette }}
+          github-token: ${{ github.token }}
+          path: Windows/package-input/anisette
+      - uses: compnerd/gha-setup-swift@86d1ddeaf915c282137601aeb0654ea0e7b7f17e
+        with:
+          swift-version: swift-6.4.1-release
+          swift-build: 6.4.1-RELEASE
+      - uses: dlang-community/setup-dlang@a6f7969b8b5dc3ff448c30f2c6749150795814f3
+        with:
+          compiler: ldc-1.43.0
+      - name: Collect licenses from the pinned Anisette dependency graph
+        shell: pwsh
+        run: ./Windows/collect-anisette-licenses.ps1 -LicenseRoot Windows/package-input/anisette/licenses/xadi
+      - name: Assemble, validate and checksum the native distribution
+        shell: pwsh
+        run: ./Windows/merge-artifacts.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xtool-windows-x64-complete
+          path: |
+            Windows/delivery/xtool-windows-x64.zip
+            Windows/delivery/xtool-windows-x64.zip.sha256

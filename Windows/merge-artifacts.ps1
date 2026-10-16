@@ -69,6 +69,22 @@ foreach ($argument in @('--version', '--help')) {
     & (Join-Path $bin 'xtool.exe') $argument
     if ($LASTEXITCODE -ne 0) { throw "Assembled CLI failed $argument" }
 }
+# Exercise the actual assembled host tools, macro server and Anisette DLL.
+$vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+$vs = & $vswhere -latest -property installationPath
+Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
+Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+$previousMacro = $env:XTOOL_NATIVE_MACRO_SERVER
+$previousAnisette = $env:XTOOL_ANISETTE_DLL
+try {
+    & (Join-Path $PSScriptRoot 'test-toolset.ps1') -ToolsetRoot (Join-Path $bin 'windows-toolset')
+    $env:XTOOL_ANISETTE_DLL = Join-Path $bin 'XADIBinary.dll'
+    & python -m unittest discover -s (Join-Path $PSScriptRoot 'anisette-tests') -p test_anisette_runtime.py -v
+    if ($LASTEXITCODE -ne 0) { throw 'Assembled Anisette DLL checks failed' }
+} finally {
+    $env:XTOOL_NATIVE_MACRO_SERVER = $previousMacro
+    $env:XTOOL_ANISETTE_DLL = $previousAnisette
+}
 $archive = "$OutputRoot.zip"
 Compress-Archive -Path (Join-Path $OutputRoot '*') -DestinationPath $archive -Force
 $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()

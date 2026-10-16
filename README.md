@@ -4,7 +4,7 @@ Cross-platform Xcode replacement. Build and deploy iOS apps with SwiftPM on Linu
 
 ## Overview
 
-xtool is a cross-platform (Linux/WSL/macOS) tool that replicates Xcode functionality with open standards.
+xtool is a cross-platform (Windows/Linux/macOS) tool that replicates Xcode functionality with open standards.
 
 ✅ Build a SwiftPM package into an iOS app
 
@@ -12,17 +12,18 @@ xtool is a cross-platform (Linux/WSL/macOS) tool that replicates Xcode functiona
 
 ✅ Interact with Apple Developer Services programmatically
 
-## Native Windows development
+## Native Windows
 
 The native Windows implementation and build instructions are available in
 [Windows/README.md](Windows/README.md). Native CLI/device libraries, local Anisette
 and Windows SDK host tools have dedicated CI workflows. See that document for
-verified checks and remaining end-to-end validation.
+build instructions, verified checks and remaining device/account validation.
 
 ## Getting Started
 
 1. Follow the guide to install `xtool`
-    - [Installation (Linux/Windows)](https://xtool.sh/documentation/xtooldocs/installation-linux)
+    - [Native Windows](Windows/README.md)
+    - [Installation (Linux/WSL)](https://xtool.sh/documentation/xtooldocs/installation-linux)
     - [Installation (macOS)](https://xtool.sh/documentation/xtooldocs/installation-macos)
 2. Create and run your first xtool-powered app by following the [tutorial](https://xtool.sh/tutorials/xtooldocs/first-app)!
 

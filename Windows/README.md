@@ -1,13 +1,14 @@
 # Native Windows port
 
 Native Windows implementation using Swift, MSVC, Win32 and native C/C++/D
-libraries. WSL is not used. The complete CLI and SDK toolchain are being validated
-on Windows CI; device/account integration also requires an Apple account, Xcode
-SDK and an iPhone. This document distinguishes implementation from test coverage.
+libraries. WSL is not used. The optimized x64 CLI, native dependencies and SDK
+host tools build and pass their Windows test suites. Account/device integration
+requires an Apple account, a real Xcode SDK and an iPhone; that coverage is listed
+separately below.
 
 ## Build
 
-Use Windows x64, PowerShell 7, Visual Studio 2022 C++ tools and Windows SDK,
+Use Windows 10/11 x64, PowerShell 7, Visual Studio 2022 C++ tools and Windows SDK,
 Git, CMake, Python 3, Swift 6.4.1, LDC 1.43.0 with Dub, and vcpkg. Run from a
 Visual Studio developer PowerShell session so `mt.exe` and MSVC are available.
 
@@ -82,9 +83,10 @@ macOS simulator commands retain their upstream platform restrictions.
 | Darwin linking | Native response-file trampoline, LLVM linker and Apple librarian |
 | SDK | Windows triples and native LLVM/macros tools, `.exe` tool paths |
 | IDE/BSP | Native executable invocation and Windows environment handling |
-| Signing | Native OpenSSL/zsign and patched Windows directory enumeration |
+| Signing | Native OpenSSL/zsign, Unicode/long-path I/O, nested framework sealing and thread-safe mappings |
 | Device operations | Native libplist, usbmuxd, libimobiledevice and SwiftyMobileDevice |
 | Local Anisette | Native XADIBinary.dll, Windows/SysV ABI thunk, local Apple-library initialization |
+| Networking | Native WinHTTP HTTP/TLS/WebSockets, streaming downloads, redirects, cookies, gzip, proxy tunnels and cancellation |
 | Developer Services | Shared authentication, provisioning, teams, certificates, identifiers, profiles and app groups |
 
 ## Validation
@@ -93,42 +95,75 @@ Independent Windows workflows build/test the CLI and native dependencies,
 the Anisette runtime, the macro server and the SDK host tools. Separating them avoids restarting
 the long LLVM build when a CLI or Anisette fix changes.
 
-Verified so far:
+Verified on native Windows:
 
-- Native Windows Anisette DLL builds and passes export/error-boundary tests.
-  The public Apple Music APK's x86_64 libraries initialize successfully; Android
-  ID and provisioning-directory calls cross the ABI boundary. Complete anonymous
-  Apple provisioning and local OTP generation also pass; no Apple ID is used.
-- 20 native helper tests and the Win32 lock/DPAPI tests pass on Windows.
-  The archive suite also passes on Linux: response-file forwarding, exit status,
+- The complete CLI builds and links with release optimization. Both optimized
+  and diagnostic builds pass the Swift test suite; tests requiring Xcode on
+  macOS retain their platform-specific skip condition.
+- 21 archive/linker tests pass: response-file forwarding, exit status,
   raw/compressed PBZX, Unicode, hard/symbolic links, executable modes, malformed
-  archives, traversal and symlink escapes. Directory symlinks and forward
-  link chains are covered in both XIP and IPA extraction.
-  Long SDK/IPA paths and linker invocation with a bare program name also pass.
-- The native LLVM linker, Apple librarian and dsymutil build from the pinned
-  fork on Windows. The native macro server also builds and passes startup/
-  protocol-EOF verification.
-  Real Windows integration produces an arm64 iOS Mach-O dylib, an Apple static
-  archive and Mach-O DWARF debug symbols, including the linker's `-r` routing.
-  The macro server also passes a real compiler-protocol handshake, module loading,
-  SwiftUI `@Entry` expansion with Unicode content and unknown-module diagnostics.
-- The complete CLI compiles and links on native Windows with Swift optimization
-  disabled for diagnostics. The optimized release build and complete runtime
-  test suite are still in progress.
-- Windows PathKit branches pass semantic compilation and functional normalization/
-  glob checks using Swift 6.4.1; Windows integration tests are included.
-- Windows-target syntax parsing passes for 131 non-generated Swift source files.
-- Repository SwiftLint completes with zero violations.
+  archives, traversal, symlink escapes, forward directory-link chains and long
+  SDK/IPA paths. IPA symlink targets retain UTF-8 and POSIX separators.
+- 11 native WinHTTP tests pass: fragmented/empty WebSocket messages, failed
+  upgrades, HTTP POST/streaming, duplicate headers, redirects, gzip, cookie
+  isolation, TLS WebSockets, HTTPS proxy tunnels and cancellation. Additional
+  certificate roots remain private to the client; untrusted, expired and
+  wrong-host certificates are rejected before HTTP data is sent.
+- Swift integration reaches the real `gsa.apple.com` and
+  `developerservices2.apple.com` HTTPS endpoints without credentials.
+- Signing tests create ad-hoc and RSA certificate signatures on genuine arm64
+  Mach-O fixtures in long Unicode paths. Nested frameworks and resource hashes
+  are verified. An independent OpenSSL verifier checks the detached CMS
+  signature and rejects a changed CodeDirectory; mismatched signing keys
+  produce an error. The synthetic test certificate is not Apple-issued.
+- Console tests verify Unicode password input and restored echo. DPAPI tests
+  cover encryption, migration, corruption rejection and removal. File tests
+  verify locks, hardlinks and relocated directory-link chains.
+- CLI integration creates projects, checks native BSP configuration, accepts
+  redirected UTF-8 input and builds/installs/updates/removes a synthetic SDK on
+  NTFS. Source Xcode metadata remains unchanged.
+- Native LLVM tools compile C and Swift Builtin code into arm64 iOS Mach-O,
+  link dylibs, create Apple static archives and produce DWARF debug symbols.
+  The real `-r` trampoline is exercised with the native Apple librarian.
+- The macro server passes compiler-protocol negotiation, module loading,
+  Unicode SwiftUI `@Entry` expansion and unknown-module diagnostics. The same
+  tests pass through the executable symlink used by installed SDKs.
+- The native Anisette DLL passes C-to-D export/error-boundary tests. Apple's
+  x86_64 libraries initialize; complete anonymous Apple provisioning and local
+  OTP generation pass without an Apple ID.
+- Repository `make lint` and PowerShell syntax checks pass.
 
-Pending Windows CI results and integration coverage:
+### Command coverage
 
-- Optimized CLI build and `swift test`, HTTP/WebSocket loopback tests, project
-  creation/redirected console tests and a synthetic Windows SDK integration test.
-- Real Xcode SDK install/update/remove and example compilation including
-  SwiftUI macros and SwiftBuild/BSP.
+| Commands | Windows implementation and validation boundary |
+| --- | --- |
+| `setup` | Native SDK/authentication components; complete setup needs the user's SDK/account |
+| `auth login/status/logout` | Native console, WinHTTP, Anisette and DPAPI; account/2FA needs live credentials |
+| `sdk build/install/update/remove/status` | Native archive/tools/file operations; synthetic lifecycle passes, real Xcode integration remains external |
+| `new` | Project creation, UTF-8 input and native BSP configuration pass |
+| `dev build/run` | Native Swift, LLVM, macros and deployment libraries; a full app build/run needs a real SDK/device |
+| `dev xcode` | Shared Xcode project generator and Windows PathKit/XcodeProj dependencies |
+| `dev build-server` | Native executable/environment forwarding; BSP configuration is tested |
+| `ds teams/certificates/identifiers/devices/profiles/anisette` | Shared API operations over native networking/crypto; account mutations need live credentials |
+| `devices/install/uninstall/launch` | Native libimobiledevice/usbmuxd stack; USB/network device checks need hardware |
+
+### Remaining external validation
+
+- Install/update/remove a real Xcode SDK and compile an example app, including
+  SwiftUI macros and SwiftBuild/BSP, against that SDK.
 - Apple ID/2FA, ASC keys, account provisioning and real-device USB/network
-  signing/install/launch/uninstall. These require external credentials/hardware.
-- ARM64 support is not release-validated; the complete build targets x64 and the
-  local Anisette implementation currently uses Apple's x86_64 libraries.
+  signing/install/launch/uninstall.
+- Native ARM64 is not provided by this x64 distribution. The local Anisette
+  implementation uses Apple's x86_64 libraries.
+- Apple's iOS Simulator runtime is macOS-only; simulator commands retain the
+  upstream macOS restriction.
 
-A passing helper or Anisette build alone is not evidence of full feature parity.
+Automated CI success does not establish end-to-end feature parity for hardware,
+credentials or proprietary SDK content that was not available to the runners.
+
+## Distribution
+
+The `Native Windows distribution` workflow combines successful, source-compatible
+CLI, Anisette and SDK-tool artifacts. It validates the x64 PE files, includes
+component revisions, resolved dependencies and licenses, runs the assembled CLI,
+and publishes `xtool-windows-x64.zip` with a SHA-256 checksum.
