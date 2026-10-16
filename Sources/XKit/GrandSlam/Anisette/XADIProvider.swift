@@ -102,9 +102,13 @@ public actor XADIProvider: RawADIProvider {
     }
 
     public func clientInfo() async throws -> String {
+        #if os(Windows)
+        "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKitWin/1 (com.apple.iCloud/7.21)>"
+        #else
         """
         <MacBookPro13,2> <macOS;13.1;22C65> <com.apple.AuthKit/1 (com.apple.dt.Xcode/3594.4.19)>
         """
+        #endif
     }
 
     public func startProvisioning(spim: Data, userID: UUID) async throws -> (any RawADIProvisioningSession, Data) {
