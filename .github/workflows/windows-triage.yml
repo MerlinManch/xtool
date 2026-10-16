@@ -58,3 +58,8 @@ jobs:
         with:
           path: .build
           key: windows-semantic-6.4.1-${{ github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: xtool-windows-diagnostic-${{ github.sha }}
+          path: Windows/dist/
