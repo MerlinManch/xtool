@@ -3,7 +3,7 @@ on:
   push:
     paths: ['.github/workflows/windows-package.yml', 'Windows/merge-artifacts.ps1', 'Windows/collect-anisette-licenses.ps1', 'Windows/package.ps1', 'Windows/bundle-runtime.py', 'Windows/runtime-tests/**']
   workflow_run:
-    workflows: ['Native Windows port']
+    workflows: ['Native Windows port', 'Native Windows helper tests']
     types: [completed]
   workflow_dispatch:
 permissions:
@@ -29,12 +29,15 @@ jobs:
             const branch = completed?.head_branch ?? context.ref.replace('refs/heads/', '');
             const specifications = {
               cli: ['windows-native.yml', 'xtool-windows-native-x64'],
+              helpers: ['windows-helpers.yml', 'xtool-windows-helpers-x64'],
               sdk: ['windows-sdk-tools.yml', 'xtool-windows-sdk-tools-x64'],
               anisette: ['windows-anisette.yml', 'xtool-windows-anisette-x64']
             };
             const records = {};
+            const completedComponent = completed?.name === 'Native Windows port' ? 'cli'
+              : completed?.name === 'Native Windows helper tests' ? 'helpers' : null;
             for (const [name, [workflow_id, artifactName]] of Object.entries(specifications)) {
-              const runs = name === 'cli' && completed
+              const runs = name === completedComponent && completed
                 ? [completed]
                 : (await github.rest.actions.listWorkflowRuns({ ...repo, workflow_id, branch, status: 'success', per_page: 20 })).data.workflow_runs;
               for (const run of runs) {
@@ -60,7 +63,13 @@ jobs:
               }
             }
             await checkPaths(sourceRef, records.cli.head_sha,
-              ['Sources', 'Tests', 'Package.swift', 'Windows/build.ps1', 'Windows/native', 'Windows/patches']);
+              ['Sources', 'Tests', 'Package.swift', 'Package.resolved', 'Windows/build.ps1', 'Windows/vcpkg.json', 'Windows/patches', 'Windows/cli-tests']);
+            // The CLI's Swift/C sources and the standalone native helper sources
+            // are checked separately so an extractor fix can reuse a verified CLI.
+            await checkPaths(sourceRef, records.helpers.head_sha,
+              ['Windows/native', 'Windows/build.ps1', 'Windows/vcpkg.json',
+               'Sources/CWindowsSupport', 'Sources/CWindowsWebSocket', 'Windows/tests',
+               'Windows/websocket-tests', '.github/workflows/windows-helpers.yml']);
             await checkPaths(records.cli.head_sha, records.sdk.head_sha, ['Windows/build-toolset.ps1']);
             await checkPaths(records.cli.head_sha, records.anisette.head_sha,
               ['Windows/build-anisette.ps1', 'Windows/patches/xadi.patch', 'Sources/CWindowsADI/include/CWindowsADI.h']);
@@ -71,6 +80,12 @@ jobs:
           run-id: ${{ steps.components.outputs.cli }}
           github-token: ${{ github.token }}
           path: Windows/package-input/cli
+      - uses: actions/download-artifact@v4
+        with:
+          name: xtool-windows-helpers-x64
+          run-id: ${{ steps.components.outputs.helpers }}
+          github-token: ${{ github.token }}
+          path: Windows/package-input/helpers
       - uses: actions/download-artifact@v4
         with:
           name: xtool-windows-sdk-tools-x64

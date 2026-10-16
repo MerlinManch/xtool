@@ -40,6 +40,12 @@ class XcodeCPIOPermissionsTests(unittest.TestCase):
         self.assertEqual(set(os.listdir(a.parent)), set(names))
         if os.name == 'nt' and not mode & 0o200:
             self.assertFalse(a.stat().st_mode & stat.S_IWRITE, 'Read-only archive mode was lost')
+        sdk = self.root / f'SDK links {self.count}'
+        sdk.mkdir()
+        installed = sdk / 'header.h'
+        os.link(a, installed)
+        self.assertTrue(os.path.samefile(a, installed))
+        self.assertEqual(installed.read_bytes(), expected)
 
     def test_read_only_manpages_with_data_in_either_link(self):
         for mode in (0o444, 0o644):

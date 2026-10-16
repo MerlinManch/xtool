@@ -10,7 +10,7 @@ if (-not $IsWindows) { throw 'Use PowerShell 7 on native Windows.' }
 if (Test-Path $OutputRoot) { throw "Output already exists: $OutputRoot" }
 if (-not (Test-Path $Metadata -PathType Leaf)) { throw 'Component build metadata is required.' }
 $builds = Get-Content $Metadata -Raw | ConvertFrom-Json
-foreach ($component in @('cli', 'sdk', 'anisette')) {
+foreach ($component in @('cli', 'helpers', 'sdk', 'anisette')) {
     $record = $builds.$component
     if (-not $record.head_sha -or -not $record.run_id -or -not $record.artifact_id -or -not $record.digest) {
         throw "Incomplete build provenance for $component"
@@ -21,6 +21,7 @@ foreach ($component in @('cli', 'sdk', 'anisette')) {
 }
 New-Item -ItemType Directory -Force $OutputRoot | Out-Null
 Copy-Item (Join-Path $InputRoot 'cli/*') $OutputRoot -Recurse -Force
+Copy-Item (Join-Path $InputRoot 'helpers/*') $OutputRoot -Recurse -Force
 Copy-Item (Join-Path $InputRoot 'anisette/*') $OutputRoot -Recurse -Force
 $bin = Join-Path $OutputRoot 'bin'
 Copy-Item (Join-Path $InputRoot 'sdk/*') $bin -Recurse -Force
@@ -89,7 +90,15 @@ Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
 Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
 $previousMacro = $env:XTOOL_NATIVE_MACRO_SERVER
 $previousAnisette = $env:XTOOL_ANISETTE_DLL
+$previousNativeBin = $env:XTOOL_NATIVE_BIN
 try {
+    # Exercise the archive helpers from the assembled distribution, including
+    # Xcode's case-distinct CPIO hardlinks, before publishing this ZIP.
+    $env:XTOOL_NATIVE_BIN = $bin
+    & python -m unittest discover -s (Join-Path $PSScriptRoot 'tests') -p test_native_tools.py -k XIPTests -k ZIPTests -v
+    if ($LASTEXITCODE -ne 0) { throw 'Assembled archive helper regression tests failed' }
+    & python -m unittest discover -s (Join-Path $PSScriptRoot 'xip-regression-tests') -v
+    if ($LASTEXITCODE -ne 0) { throw 'Assembled CPIO permissions and payload tests failed' }
     & (Join-Path $PSScriptRoot 'test-toolset.ps1') -ToolsetRoot (Join-Path $bin 'windows-toolset')
     $env:XTOOL_ANISETTE_DLL = Join-Path $bin 'XADIBinary.dll'
     & python -m unittest discover -s (Join-Path $PSScriptRoot 'anisette-tests') -p test_anisette_runtime.py -v
@@ -97,6 +106,7 @@ try {
 } finally {
     $env:XTOOL_NATIVE_MACRO_SERVER = $previousMacro
     $env:XTOOL_ANISETTE_DLL = $previousAnisette
+    $env:XTOOL_NATIVE_BIN = $previousNativeBin
 }
 $archive = "$OutputRoot.zip"
 Compress-Archive -Path (Join-Path $OutputRoot '*') -DestinationPath $archive -Force

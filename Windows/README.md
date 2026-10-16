@@ -64,7 +64,7 @@ with a current distribution; do not copy only `xtool.exe`. If necessary, install
 the x64 Visual C++ Redistributable from Microsoft's official site. Other exit
 codes need separate diagnosis.
 
-Enable Windows Developer Mode or symlink privileges and long paths. Use NTFS and
+Enable Windows Developer Mode or symlink privileges and long paths. Use
 local NTFS storage for SDKs. The XIP extractor enables case sensitivity on each
 Xcode directory before writing its contents, and SDK install/update preserves it.
 This retains case-distinct headers and hardlinked manpages such as
@@ -116,7 +116,9 @@ Verified on native Windows:
   raw/compressed PBZX, Unicode, hard/symbolic links, executable modes, malformed
   archives, traversal, symlink escapes, forward directory-link chains and long
   SDK/IPA paths, plus case-distinct directories, symlinks and CPIO hardlinks.
-  IPA symlink targets retain UTF-8 and POSIX separators.
+  Additional CPIO cases cover read-only hardlinks with payloads in the first,
+  last or every link entry. Windows read-only file modes are applied after all
+  payloads have been written. IPA symlink targets retain UTF-8 and POSIX separators.
 - 11 native WinHTTP tests pass: fragmented/empty WebSocket messages, failed
   upgrades, HTTP POST/streaming, duplicate headers, redirects, gzip, cookie
   isolation, TLS WebSockets, HTTPS proxy tunnels and cancellation. Additional
@@ -177,10 +179,12 @@ credentials or proprietary SDK content that was not available to the runners.
 ## Distribution
 
 The `Native Windows distribution` workflow combines successful, source-compatible
-CLI, Anisette and SDK-tool artifacts. It validates the x64 PE files, includes
+CLI, native-helper, Anisette and SDK-tool artifacts. It validates the x64 PE files, includes
 component revisions, resolved dependencies and licenses, runs the assembled CLI,
 and publishes `xtool-windows-x64.zip` with a SHA-256 checksum. Runtime import
 closures and hashes are recorded in `runtime-files.json`. Before archiving, the
 CLI must produce help/version output with only Windows System32 on PATH, from
 an unrelated working directory. The macro protocol and installed-SDK symlink
-tests also run in that environment.
+tests also run in that environment. The assembled archive helpers must pass the
+XIP/IPA suite, including the case-distinct Xcode manpage regression, before the
+ZIP is published.
