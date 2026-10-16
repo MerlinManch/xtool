@@ -68,6 +68,8 @@ class CLITests(unittest.TestCase):
             (base / 'Info.plist').write_bytes(plistlib.dumps({'DefaultProperties': {}}))
             sdk = base / f'Developer/SDKs/{platform}99.0.sdk/System/Library/Frameworks'
             sdk.mkdir(parents=True)
+            sdk_root = base / 'Developer/SDKs'
+            (sdk_root / f'{platform}.sdk').symlink_to(Path(f'{platform}99.0.sdk'), target_is_directory=True)
             for framework in ['Testing', 'XCTest', 'XCUIAutomation', 'XCTestCore']:
                 group = 'PrivateFrameworks' if framework == 'XCTestCore' else 'Frameworks'
                 target = base / f'Developer/Library/{group}/{framework}.framework'
@@ -79,6 +81,7 @@ class CLITests(unittest.TestCase):
             (framework / 'Versions/Current').symlink_to(Path('A'), target_is_directory=True)
             (framework / 'Headers').symlink_to(Path('Versions/Current/Headers'), target_is_directory=True)
             self.assertEqual((framework / 'Headers/example.h').read_text(), 'header')
+            self.assertEqual((sdk_root / f'{platform}.sdk/System/Library/Frameworks/Example.framework/Headers/example.h').read_text(), 'header')
         env = dict(os.environ, XTOOL_WINDOWS_TOOLSET=str(tools.parent), XTOOL_WINDOWS_MACROS=str(macros))
         result = self.invoke('sdk', 'build', str(app), str(self.root / 'output'), env=env)
         output_root = self.root / 'output'
