@@ -94,6 +94,19 @@ func windowsNativeSigningAndAnalysis(certificateSigning: Bool) async throws {
     try verifyNativeResource(in: outer, path: "Frameworks/Inner.framework/Über🔏", data: nestedData)
     let extracted = try await signer.analyze(executable: executable)
     #expect(try PropertyListSerialization.propertyList(from: extracted, format: nil) is [String: Any])
+    if let certificateData {
+        let wrongKey = try _RSA.Signing.PrivateKey(keySize: .bits2048)
+        let identity = Signer.Identity.real(
+            try XKit.Certificate(data: certificateData),
+            XKit.PrivateKey(data: Data(wrongKey.pemRepresentation.utf8))
+        )
+        do {
+            try await signer.sign(app: app, identity: identity, entitlementMapping: [app: entitlements]) { _ in }
+            Issue.record("Expected mismatched signing key to throw")
+        } catch {
+            #expect(error is Signer.Error)
+        }
+    }
 }
 
 private func makeNativeSigningBundle(at app: URL, executableData: Data, identifier: String) throws -> URL {

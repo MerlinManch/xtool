@@ -586,3 +586,20 @@ index a55b3fa..961a523 100644
  			return OpenFile(m_strFile.c_str());
  		}
  	}
+
+diff --git a/src/openssl.cpp b/src/openssl.cpp
+--- a/src/openssl.cpp
++++ b/src/openssl.cpp
+@@ -273,5 +273,11 @@
+ bool ZSignAsset::CMSError()
+ {
+-	ERR_print_errors_fp(stdout);
++	// Avoid passing a CRT FILE pointer across the Windows OpenSSL DLL boundary.
++	unsigned long error;
++	while ((error = ERR_get_error()) != 0) {
++		char description[256];
++		ERR_error_string_n(error, description, sizeof(description));
++		ZLog::ErrorV("%s\n", description);
++	}
+ 	return false;
+ }
