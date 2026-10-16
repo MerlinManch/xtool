@@ -4,6 +4,8 @@ import gzip
 import importlib.util
 import os
 import ssl
+import select
+import socket
 from pathlib import Path
 import threading
 import unittest
@@ -21,6 +23,8 @@ class WinHTTPTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.dll = ctypes.CDLL(os.environ['XTOOL_WINHTTP_TEST_DLL'])
+        cls.dll.xtool_ws_connect_with_client.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_wchar_p,
+            ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32)]
         cls.dll.xtool_http_client_create.argtypes = [ctypes.c_char_p, ctypes.c_wchar_p, ctypes.c_int,
                                                     ctypes.POINTER(ctypes.c_uint32)]
         cls.dll.xtool_http_client_create.restype = ctypes.c_void_p
@@ -129,10 +133,10 @@ class WinHTTPTests(unittest.TestCase):
         finally:
             self.dll.xtool_ws_release_data(data)
 
-    def client(self, trusted=True):
+    def client(self, trusted=True, proxy=None):
         roots = (Path(__file__).parent / 'fixtures/ca.pem').read_bytes() if trusted else None
         error = ctypes.c_uint32()
-        client = self.dll.xtool_http_client_create(roots, None, 0, ctypes.byref(error))
+        client = self.dll.xtool_http_client_create(roots, proxy, 0, ctypes.byref(error))
         self.assertTrue(client, error.value)
         self.addCleanup(self.dll.xtool_http_client_destroy, client)
         return client
@@ -209,6 +213,59 @@ class WinHTTPTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertNotEqual(error, 0)
         self.assertEqual(server.received_paths, ['/'], 'untrusted server received HTTP credentials/headers')
+
+    def test_tls_websocket_uses_additional_roots(self):
+        _, base = self.tls_server('localhost.pem')
+        state = self.create()
+        error, status = ctypes.c_uint32(), ctypes.c_uint32()
+        result = self.dll.xtool_ws_connect_with_client(state, self.client(), base + 'ws',
+            ctypes.byref(error), ctypes.byref(status))
+        self.assertEqual((result, error.value, status.value), (1, 0, 101))
+        data = b'native TLS WebSocket'
+        buffer = ctypes.create_string_buffer(data)
+        self.assertEqual(self.dll.xtool_ws_send(state, buffer, len(data), 1, ctypes.byref(error)), 1, error.value)
+        self.assertEqual(self.receive(state), (1, 0, 1, 0, data))
+        self.dll.xtool_ws_shutdown(state)
+
+    def test_https_proxy_tunnel_preserves_certificate_validation(self):
+        class Proxy(fixture.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_CONNECT(self):
+                host, port = self.path.rsplit(':', 1)
+                with socket.create_connection((host, int(port)), timeout=3) as upstream:
+                    self.send_response(200, 'Connection Established')
+                    self.end_headers()
+                    self.wfile.flush()
+                    peers = [self.connection, upstream]
+                    while True:
+                        readable, _, _ = select.select(peers, [], [], 3)
+                        if not readable:
+                            return
+                        for peer in readable:
+                            data = peer.recv(65536)
+                            if not data:
+                                return
+                            (upstream if peer is self.connection else self.connection).sendall(data)
+        proxy = ThreadingHTTPServer(('127.0.0.1', 0), Proxy)
+        proxy.daemon_threads = True
+        worker = threading.Thread(target=proxy.serve_forever, daemon=True)
+        worker.start()
+        def cleanup():
+            proxy.shutdown()
+            proxy.server_close()
+            worker.join(2)
+        self.addCleanup(cleanup)
+        server, url = self.tls_server('localhost.pem')
+        named_proxy = f'127.0.0.1:{proxy.server_port}'
+        state, result, error, status = self.open_http(self.client(proxy=named_proxy), url)
+        self.assertEqual((result, error, status), (1, 0, 200))
+        self.assertEqual(self.read_http(state), 'native HTTP ü'.encode())
+        _, result, error, _ = self.open_http(self.client(trusted=False, proxy=named_proxy), url)
+        self.assertEqual(result, 0)
+        self.assertNotEqual(error, 0)
+        self.assertEqual(server.received_paths, ['/'])
 
     def test_expired_and_wrong_hostname_certificates_never_receive_http(self):
         for certificate in ['expired.pem', 'wrong-host.pem']:

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 concurrency:
   group: windows-native-spm-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   helpers:
     runs-on: windows-2022
