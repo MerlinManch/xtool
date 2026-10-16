@@ -1,7 +1,7 @@
 name: Native Windows semantic checks
 on:
   push:
-    paths: ['Sources/**', 'Tests/**', 'Package.swift', 'Windows/build.ps1', 'Windows/patches/**', '.github/workflows/windows-triage.yml']
+    paths: ['Sources/**', 'Tests/**', 'Package.swift', 'Windows/build.ps1', 'Windows/cli-tests/**', 'Windows/patches/**', '.github/workflows/windows-triage.yml']
   workflow_dispatch:
 concurrency:
   group: windows-semantic-spm-${{ github.ref }}

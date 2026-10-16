@@ -76,8 +76,9 @@ class CLITests(unittest.TestCase):
             framework = sdk / 'Example.framework'
             (framework / 'Versions/A/Headers').mkdir(parents=True)
             (framework / 'Versions/A/Headers/example.h').write_text('header')
-            (framework / 'Versions/Current').symlink_to('A', target_is_directory=True)
-            (framework / 'Headers').symlink_to('Versions/Current/Headers', target_is_directory=True)
+            (framework / 'Versions/Current').symlink_to(Path('A'), target_is_directory=True)
+            (framework / 'Headers').symlink_to(Path('Versions/Current/Headers'), target_is_directory=True)
+            self.assertEqual((framework / 'Headers/example.h').read_text(), 'header')
         env = dict(os.environ, XTOOL_WINDOWS_TOOLSET=str(tools.parent), XTOOL_WINDOWS_MACROS=str(macros))
         result = self.invoke('sdk', 'build', str(app), str(self.root / 'output'), env=env)
         output_root = self.root / 'output'
