@@ -97,14 +97,20 @@ Verified so far:
   The public Apple Music APK's x86_64 libraries initialize successfully; Android
   ID and provisioning-directory calls cross the ABI boundary. Complete anonymous
   Apple provisioning and local OTP generation also pass; no Apple ID is used.
-- 17 native helper tests and the Win32 lock/DPAPI tests pass on Windows.
+- 20 native helper tests and the Win32 lock/DPAPI tests pass on Windows.
   The archive suite also passes on Linux: response-file forwarding, exit status,
   raw/compressed PBZX, Unicode, hard/symbolic links, executable modes, malformed
   archives, traversal and symlink escapes. Directory symlinks and forward
   link chains are covered in both XIP and IPA extraction.
+  Long SDK/IPA paths and linker invocation with a bare program name also pass.
 - The native LLVM linker, Apple librarian and dsymutil build from the pinned
   fork on Windows. The native macro server also builds and passes startup/
   protocol-EOF verification.
+  Real Windows integration produces an arm64 iOS Mach-O dylib, an Apple static
+  archive and Mach-O DWARF debug symbols, including the linker's `-r` routing.
+- The complete CLI compiles and links on native Windows with Swift optimization
+  disabled for diagnostics. The optimized release build and complete runtime
+  test suite are still in progress.
 - Windows PathKit branches pass semantic compilation and functional normalization/
   glob checks using Swift 6.4.1; Windows integration tests are included.
 - Windows-target syntax parsing passes for 131 non-generated Swift source files.
@@ -112,7 +118,7 @@ Verified so far:
 
 Pending Windows CI results and integration coverage:
 
-- Complete CLI build and `swift test`, HTTP/WebSocket loopback tests, project
+- Optimized CLI build and `swift test`, HTTP/WebSocket loopback tests, project
   creation/redirected console tests and a synthetic Windows SDK integration test.
 - Real Xcode SDK install/update/remove and example compilation including
   SwiftUI macros and SwiftBuild/BSP.

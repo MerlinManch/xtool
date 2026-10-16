@@ -53,7 +53,10 @@ func windowsNativeSigningAndAnalysis(certificateSigning: Bool) async throws {
     let certificateData: Data?
     if certificateSigning {
         let key = try _RSA.Signing.PrivateKey(keySize: .bits2048)
-        let name = try DistinguishedName { CommonName("xtool native Windows signing test") }
+        let name = try DistinguishedName {
+            CommonName("xtool native Windows signing test")
+            OrganizationalUnitName("XTOOLTEST1")
+        }
         let now = Date()
         let raw = try X509.Certificate(
             version: .v3, serialNumber: .init(bytes: [1]), publicKey: .init(key.publicKey),
