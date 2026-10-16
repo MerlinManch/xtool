@@ -4,6 +4,8 @@ import ctypes as c
 import hashlib
 from pathlib import Path
 import plistlib
+import re
+import ssl
 import sys
 import urllib.request
 import uuid
@@ -39,9 +41,18 @@ def run(dll, libraries, directory):
         'Content-Type': 'text/x-xml-plist',
     }
 
+    # Apple's ADI endpoints use the same Apple roots already trusted by xtool's
+    # Linux client. Extend this probe's context without changing Windows trust.
+    source = Path(__file__).resolve().parents[2] / 'Sources/XKit/HTTPClientProtocol/AsyncHTTPClient+HTTP.swift'
+    roots = re.findall(r'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----',
+                       source.read_text(), re.DOTALL)
+    assert len(roots) == 3
+    context = ssl.create_default_context()
+    context.load_verify_locations(cadata='\n'.join(roots))
+
     def fetch(url, body=None):
         request = urllib.request.Request(url, data=body, headers=headers)
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=30, context=context) as response:
             return plistlib.loads(response.read())
 
     def post(url, request):

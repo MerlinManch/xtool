@@ -73,7 +73,7 @@ public struct BuildSettings: Sendable {
                 // SWB looks for dsymutil in the PATH. Other stuff (lld, libtool) is handled by toolset-swb.json.
                 "PATH": HostPlatform.prependingSearchPath(
                     darwinSDK.bundle.appending(path: "toolset/bin").path,
-                    to: ProcessInfo.processInfo.environment["PATH"] ?? ""
+                    to: HostPlatform.environmentValue("PATH") ?? ""
                 ),
             ]) { $1 }
             #endif

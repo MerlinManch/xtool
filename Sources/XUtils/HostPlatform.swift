@@ -12,6 +12,21 @@ package enum HostPlatform {
         #endif
     }
 
+    package static func environmentValue(
+        _ name: String,
+        in environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String? {
+        #if os(Windows)
+        // ProcessInfo returns a case-sensitive Swift dictionary even though
+        // Windows environment names (commonly "Path") are case-insensitive.
+        return environment[name] ?? environment.first {
+            $0.key.caseInsensitiveCompare(name) == .orderedSame
+        }?.value
+        #else
+        return environment[name]
+        #endif
+    }
+
     package static func prependingSearchPath(_ path: String, to existing: String) -> String {
         #if os(Windows)
         let separator = ";"

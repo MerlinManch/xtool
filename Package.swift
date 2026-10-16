@@ -33,6 +33,7 @@ let nativePackages: [Package.Dependency] = [
     .package(path: "Windows/Dependencies/xtool-core"),
     .package(path: "Windows/Dependencies/zsign"),
     .package(path: "Windows/Dependencies/PathKit"),
+    .package(path: "Windows/Dependencies/XcodeProj"),
     .package(path: "Windows/Dependencies/swift-issue-reporting"),
 ]
 #else
@@ -42,6 +43,7 @@ let nativePackages: [Package.Dependency] = [
     .package(url: "https://github.com/xtool-org/xadi", .upToNextMinor(from: "0.4.2")),
     .package(url: "https://github.com/saagarjha/unxip", from: "3.2.0"),
     .package(url: "https://github.com/kylef/PathKit", from: "1.0.1"),
+    .package(url: "https://github.com/tuist/XcodeProj.git", from: "9.17.5"),
 ]
 #endif
 
@@ -110,8 +112,6 @@ let package = Package(
         .package(url: "https://github.com/attaswift/BigInt", from: "6.0.0"),
         .package(url: "https://github.com/jpsim/Yams", from: "5.1.3"),
 
-        // NB: this should only be imported from XcodeProjects
-        .package(url: "https://github.com/tuist/XcodeProj.git", from: "9.17.5"),
     ],
     targets: [
         .target(

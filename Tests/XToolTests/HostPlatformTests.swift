@@ -14,6 +14,14 @@ import XUtils
     #endif
 }
 
+#if os(Windows)
+@Test func windowsSearchPathKeepsExistingToolsWithMixedCaseEnvironmentName() {
+    let existing = HostPlatform.environmentValue("PATH", in: ["Path": "C:/Swift/bin;C:/Windows/System32"]) ?? ""
+    let updated = HostPlatform.prependingSearchPath("C:/SDK/toolset/bin", to: existing)
+    #expect(updated == "C:/SDK/toolset/bin;C:/Swift/bin;C:/Windows/System32")
+}
+#endif
+
 @Test func fileLocksExcludeOtherOpenDescriptors() throws {
     let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: path) }
