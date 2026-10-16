@@ -124,7 +124,10 @@ let package = Package(
         .target(name: "CWindowsADI"),
         .target(
             name: "CWindowsWebSocket",
-            linkerSettings: [.linkedLibrary("winhttp", .when(platforms: [.windows]))]
+            linkerSettings: [
+                .linkedLibrary("winhttp", .when(platforms: [.windows])),
+                .linkedLibrary("crypt32", .when(platforms: [.windows])),
+            ]
         ),
         .target(
             name: "CXKit",

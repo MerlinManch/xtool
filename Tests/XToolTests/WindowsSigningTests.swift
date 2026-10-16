@@ -57,11 +57,16 @@ func windowsNativeSigningAndAnalysis(certificateSigning: Bool) async throws {
             CommonName("xtool native Windows signing test")
             OrganizationalUnitName("XTOOLTEST1")
         }
+        // Synthetic leaf: exercise Apple's issuer-chain selection and CMS
+        // construction, without claiming an Apple-issued or trusted identity.
+        let issuerPEM = try String(contentsOf: fixture.deletingLastPathComponent()
+            .appendingPathComponent("wwdr-g3.pem"), encoding: .utf8)
+        let issuer = try X509.Certificate(pemEncoded: issuerPEM).subject
         let now = Date()
         let raw = try X509.Certificate(
             version: .v3, serialNumber: .init(bytes: [1]), publicKey: .init(key.publicKey),
             notValidBefore: now - 60, notValidAfter: now + 3600,
-            issuer: name, subject: name, signatureAlgorithm: .sha256WithRSAEncryption,
+            issuer: issuer, subject: name, signatureAlgorithm: .sha256WithRSAEncryption,
             extensions: .init(), issuerPrivateKey: .init(key)
         )
         let certificate = try XKit.Certificate(raw: raw)

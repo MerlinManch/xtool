@@ -14,7 +14,7 @@ add_executable(xtool-test-child ../tests/child.cpp)
 if(WIN32)
   add_library(xtool-test-websocket SHARED ../../Sources/CWindowsWebSocket/WindowsWebSocket.c)
   target_include_directories(xtool-test-websocket PRIVATE ../../Sources/CWindowsWebSocket/include)
-  target_link_libraries(xtool-test-websocket PRIVATE winhttp)
+  target_link_libraries(xtool-test-websocket PRIVATE winhttp crypt32)
   set_target_properties(xtool-test-websocket PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/websocket-tests")
   add_executable(xtool-test-support ../tests/windows_support.c ../../Sources/CWindowsSupport/WindowsSupport.c)

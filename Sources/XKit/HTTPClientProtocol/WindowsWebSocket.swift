@@ -5,7 +5,8 @@ import Foundation
 
 /// WinHTTP uses Windows certificate validation and native WebSocket framing.
 /// Operations are asynchronous in WinHTTP; cancellation closes their handles
-/// after the issuing call returns. Pending buffers live through their native\n/// completion or closing callback.
+/// after the issuing call returns. Pending buffers live through their native
+/// completion or closing callback.
 final class WindowsWebSocket: WebSocketSession, @unchecked Sendable {
     private struct Failure: LocalizedError {
         let code: UInt32
@@ -17,15 +18,17 @@ final class WindowsWebSocket: WebSocketSession, @unchecked Sendable {
     }
 
     private let handle: OpaquePointer
+    private let session: WindowsHTTPSession
 
-    private init() throws {
+    private init(session: WindowsHTTPSession) throws {
         guard let handle = xtool_ws_create() else { throw Failure(code: 8) }
         self.handle = handle
+        self.session = session
     }
 
     deinit { xtool_ws_destroy(handle) }
 
-    static func open(url: URL) async throws -> WindowsWebSocket {
+    static func open(url: URL, session: WindowsHTTPSession) async throws -> WindowsWebSocket {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let scheme = components.scheme?.lowercased(), ["ws", "wss"].contains(scheme) else {
             throw URLError(.unsupportedURL)
@@ -33,12 +36,12 @@ final class WindowsWebSocket: WebSocketSession, @unchecked Sendable {
         components.scheme = scheme == "wss" ? "https" : "http"
         components.fragment = nil
         guard let endpoint = components.url?.absoluteString else { throw URLError(.badURL) }
-        let socket = try WindowsWebSocket()
+        let socket = try WindowsWebSocket(session: session)
         try await socket.perform { socket in
             var error: UInt32 = 0
             var status: UInt32 = 0
             let result = endpoint.withCString(encodedAs: UTF16.self) {
-                xtool_ws_connect(socket.handle, $0, &error, &status)
+                xtool_ws_connect_with_client(socket.handle, socket.session.handle, $0, &error, &status)
             }
             guard result != 0 else { throw Failure(code: error, httpStatus: status) }
         }

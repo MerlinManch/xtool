@@ -25,6 +25,24 @@ func windowsHTTPAndWebSocketTransport() async throws {
     case .data(let response): #expect(response == data)
     case .text: Issue.record("Expected a binary frame")
     }
+    try await socket.send(.text(""))
+    switch try await socket.receive() {
+    case .text(let response): #expect(response.isEmpty)
+    case .data: Issue.record("Expected an empty text frame")
+    }
+    try await socket.send(.data(Data()))
+    switch try await socket.receive() {
+    case .data(let response): #expect(response.isEmpty)
+    case .text: Issue.record("Expected an empty binary frame")
+    }
+    let pending = Task { try await socket.receive() }
+    pending.cancel()
+    do {
+        _ = try await pending.value
+        Issue.record("Expected a cancelled receive to throw")
+    } catch {
+        #expect(error is CancellationError)
+    }
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["XTOOL_HTTP_TEST_URL"] != nil), .timeLimit(.minutes(1)))

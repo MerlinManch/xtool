@@ -30,6 +30,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        self.close_connection = True
         key = self.headers['Sec-WebSocket-Key']
         accept = base64.b64encode(hashlib.sha1((key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode()).digest())
         self.send_response(101)
