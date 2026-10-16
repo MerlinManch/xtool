@@ -523,7 +523,9 @@ struct SDKBuilder {
             try Task.checkCancellation()
 
             let url = appDir.appendingPathComponent(next)
-            let contents = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey])
+            let contents = try FileManager.default.contentsOfDirectory(
+                at: url, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+            )
             for child in contents {
                 let path = "\(next)/\(child.lastPathComponent)"
                 guard Self.isWanted(path[...]) else { continue }
@@ -546,12 +548,22 @@ struct SDKBuilder {
                 guard !insideDeveloper.isEmpty else { continue }
                 let dest = dev.appendingPathComponent(String(insideDeveloper))
 
+                #if os(Windows)
+                if try child.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true {
+                    try FileManager.default.copyWindowsSymbolicLink(at: child, to: dest)
+                    continue
+                }
+                #endif
                 if try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
                     toDoDirs.append(path)
                     try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: false)
                 } else if mode.usesHardLinks {
                     // Installed SDKs retain Xcode.app developer dir, so avoid storing their developer files twice.
+                    #if os(Windows)
+                    try FileManager.default.createWindowsHardLink(at: child, to: dest)
+                    #else
                     try FileManager.default.linkItem(at: child, to: dest)
+                    #endif
                 } else {
                     // Slim SDKs omit Xcode.app and contain independent copies.
                     try FileManager.default.copyItem(at: child, to: dest)

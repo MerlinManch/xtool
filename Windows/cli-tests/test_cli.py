@@ -56,6 +56,8 @@ class CLITests(unittest.TestCase):
         dev = app / 'Contents/Developer'
         include = dev / 'Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/clang/include'
         include.mkdir(parents=True)
+        for name in ['Info.plist', 'version.plist']:
+            (app / 'Contents' / name).write_bytes(plistlib.dumps({'test': True}))
         for platform in ['iPhoneOS', 'MacOSX', 'iPhoneSimulator']:
             base = dev / f'Platforms/{platform}.platform'
             base.mkdir(parents=True)
@@ -90,6 +92,20 @@ class CLITests(unittest.TestCase):
         self.assertTrue((output / 'Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/SwiftUIMacros.dll').exists())
         original = app / 'Contents/Developer/Platforms/iPhoneOS.platform/Info.plist'
         self.assertEqual(plistlib.loads(original.read_bytes()), {'DefaultProperties': {}})
+        # Exercise the normal SDK lifecycle too: genuine hardlinks must remain
+        # valid when the temporary bundle is renamed and when Xcode.app moves.
+        config = self.root / 'isolated-config'
+        env['XDG_CONFIG_HOME'] = str(config)
+        installed = config / 'swiftpm/swift-sdks/darwin.artifactbundle'
+        for args in [('sdk', 'install', str(app)), ('sdk', 'update')]:
+            result = self.invoke(*args, env=env)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            marker = installed / 'Developer/Platforms/iPhoneOS.platform/Developer/Library/Frameworks/Testing.framework/marker'
+            self.assertEqual(marker.read_text(), 'Testing')
+        result = self.invoke('sdk', 'remove', env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(installed.exists())
+
 
 
 if __name__ == '__main__':

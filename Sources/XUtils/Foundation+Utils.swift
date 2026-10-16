@@ -50,7 +50,11 @@ extension FileManager {
         }
         #endif
 
+        #if os(Windows)
+        try copyWindowsTree(at: srcURL, to: dstURL)
+        #else
         try self.copyItem(at: srcURL, to: dstURL)
+        #endif
     }
 }
 

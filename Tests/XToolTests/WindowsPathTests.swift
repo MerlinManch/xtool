@@ -35,4 +35,26 @@ import XUtils
         #expect(try WindowsDataProtection.unprotect(encrypted) == original)
     }
 }
+@Test func windowsSDKCopiesPreserveDirectoryLinksAndHardLinksSurviveRelocation() async throws {
+    let manager = FileManager.default
+    let root = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try manager.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? manager.removeItem(at: root) }
+    let source = root.appendingPathComponent("source")
+    let target = source.appendingPathComponent("Z-target")
+    try manager.createDirectory(at: target, withIntermediateDirectories: true)
+    try Data("original".utf8).write(to: target.appendingPathComponent("file"))
+    try manager.createSymbolicLink(atPath: source.appendingPathComponent("A-link").path,
+                                   withDestinationPath: "Z-target")
+    let copy = root.appendingPathComponent("copy")
+    try await manager.copyItem(at: source, to: copy, preserveOwner: false)
+    #expect(try manager.destinationOfSymbolicLink(atPath: copy.appendingPathComponent("A-link").path) == "Z-target")
+    #expect(try Data(contentsOf: copy.appending(path: "A-link/file")) == Data("original".utf8))
+    let link = root.appendingPathComponent("hard-link")
+    try manager.createWindowsHardLink(at: target.appendingPathComponent("file"), to: link)
+    let moved = root.appendingPathComponent("moved")
+    try manager.moveItem(at: source, to: moved)
+    try Data("updated".utf8).write(to: moved.appending(path: "Z-target/file"))
+    #expect(try Data(contentsOf: link) == Data("updated".utf8))
+}
 #endif
