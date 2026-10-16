@@ -1,6 +1,8 @@
 """Exercise the actual Swift compiler-plugin wire protocol on native Windows."""
 import json
 import os
+from pathlib import Path
+import tempfile
 import struct
 import subprocess
 import unittest
@@ -22,6 +24,16 @@ def frame(message):
                      'native Windows macro server required')
 class MacroProtocolTests(unittest.TestCase):
     def test_capability_module_loading_and_real_swiftui_expansion(self):
+        self.assert_protocol(Path(os.environ['XTOOL_NATIVE_MACRO_SERVER']))
+
+    def test_installed_sdk_executable_symlink(self):
+        with tempfile.TemporaryDirectory(prefix='xtool installed macro ü ') as directory:
+            link = Path(directory) / 'Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server.exe'
+            link.parent.mkdir(parents=True)
+            link.symlink_to(Path(os.environ['XTOOL_NATIVE_MACRO_SERVER']).resolve())
+            self.assert_protocol(link)
+
+    def assert_protocol(self, executable):
         messages = [
             {'getCapability': {'capability': {'protocolVersion': 8}}},
             {'loadPluginLibrary': {'libraryPath': 'C:/sdk ü/SwiftUIMacros.dll', 'moduleName': 'SwiftUIMacros'}},
@@ -35,7 +47,7 @@ class MacroProtocolTests(unittest.TestCase):
             }},
             {'loadPluginLibrary': {'libraryPath': 'C:/missing.dll', 'moduleName': 'MissingWindowsTestModule'}},
         ]
-        result = subprocess.run([os.environ['XTOOL_NATIVE_MACRO_SERVER']],
+        result = subprocess.run([str(executable)],
                                 input=b''.join(map(frame, messages)), capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8', errors='replace'))
         replies = []
