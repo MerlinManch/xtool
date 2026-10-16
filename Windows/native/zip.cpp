@@ -46,6 +46,9 @@ static void compress(const fs::path& source, const fs::path& destination) {
     Writer zip(archive_write_new());
     check(archive_write_set_format_zip(zip.get()), zip.get());
     check(archive_write_set_options(zip.get(), "zip:compression=store"), zip.get());
+    // Windows otherwise converts link payloads to its OEM code page, even
+    // when archive entry names were supplied as UTF-8. IPA links must be UTF-8.
+    check(archive_write_set_format_option(zip.get(), "zip", "hdrcharset", "UTF-8"), zip.get());
 #ifdef _WIN32
     check(archive_write_open_filename_w(zip.get(), destination.c_str()), zip.get());
 #else
