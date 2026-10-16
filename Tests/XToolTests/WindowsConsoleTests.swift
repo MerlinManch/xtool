@@ -11,7 +11,7 @@ struct WindowsConsoleTests {
         defer { if allocated { _ = FreeConsole() } }
         let previous = GetStdHandle(STD_INPUT_HANDLE)
         let handle = "CONIN$".withCString(encodedAs: UTF16.self) {
-            CreateFileW($0, DWORD(GENERIC_READ | GENERIC_WRITE),
+            CreateFileW($0, DWORD(GENERIC_READ) | DWORD(GENERIC_WRITE),
                         DWORD(FILE_SHARE_READ | FILE_SHARE_WRITE), nil, DWORD(OPEN_EXISTING), 0, nil)
         }
         let input = try #require(handle)
