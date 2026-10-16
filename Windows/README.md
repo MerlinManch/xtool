@@ -44,8 +44,10 @@ The host CLI is built with SwiftPM's native backend; pass
 ## Run
 
 Keep all files from the distribution together and add its `bin` directory to
-PATH. A compatible installed Swift toolchain is required for Swift compilation
-and supplies the Swift runtime DLLs; Visual C++ runtime prerequisites also apply.
+PATH. The distribution bundles Swift runtime DLLs beside each executable,
+including the macro server. A compatible installed Swift toolchain is required
+for Swift compilation, but not for `xtool.exe --help`. The Microsoft Visual C++
+2015–2022 Redistributable (x64) must be installed.
 The executable manifest enables UTF-8 and long paths.
 
 ```powershell
@@ -54,6 +56,13 @@ xtool.exe sdk install C:/Downloads/Xcode.xip
 xtool.exe auth login
 xtool.exe devices
 ```
+
+If an older package exits without output, run `./xtool.exe --help` followed
+immediately by `$LASTEXITCODE`. Exit code `-1073741515` (`0xC0000135`) means
+Windows could not load a required DLL. Replace the complete extracted package
+with a current distribution; do not copy only `xtool.exe`. If necessary, install
+the x64 Visual C++ Redistributable from Microsoft's official site. Other exit
+codes need separate diagnosis.
 
 Enable Windows Developer Mode or symlink privileges and long paths. Use NTFS and
 a case-sensitive SDK directory where Xcode SDK contents require names differing
@@ -166,4 +175,8 @@ credentials or proprietary SDK content that was not available to the runners.
 The `Native Windows distribution` workflow combines successful, source-compatible
 CLI, Anisette and SDK-tool artifacts. It validates the x64 PE files, includes
 component revisions, resolved dependencies and licenses, runs the assembled CLI,
-and publishes `xtool-windows-x64.zip` with a SHA-256 checksum.
+and publishes `xtool-windows-x64.zip` with a SHA-256 checksum. Runtime import
+closures and hashes are recorded in `runtime-files.json`. Before archiving, the
+CLI must produce help/version output with only Windows System32 on PATH, from
+an unrelated working directory. The macro protocol and installed-SDK symlink
+tests also run in that environment.

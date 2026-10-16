@@ -6,6 +6,10 @@ if (-not $IsWindows) { throw 'Use PowerShell 7 on native Windows.' }
 $root = Split-Path $PSScriptRoot -Parent
 $dist = Join-Path $PSScriptRoot 'dist'
 $bin = Join-Path $dist 'bin'
+& python (Join-Path $PSScriptRoot 'bundle-runtime.py') $dist
+if ($LASTEXITCODE -ne 0) { throw 'Runtime DLL deployment failed' }
+& python (Join-Path $PSScriptRoot 'bundle-runtime.py') $dist --smoke
+if ($LASTEXITCODE -ne 0) { throw 'Clean-environment runtime checks failed' }
 $required = @('xtool.exe', 'XADIBinary.dll', 'xtool-linker.exe', 'xtool-codesign.exe',
     'xtool-zip.exe', 'xtool-unxip.exe', 'windows-toolset/bin/ld64.lld.exe',
     'windows-toolset/bin/llvm-libtool-darwin.exe', 'windows-toolset/bin/dsymutil.exe',
@@ -16,6 +20,15 @@ foreach ($file in $required) {
 $licenses = Join-Path $dist 'licenses'
 New-Item -ItemType Directory -Force $licenses | Out-Null
 Copy-Item (Join-Path $root 'LICENSE.md') (Join-Path $licenses 'xtool.txt') -Force
+foreach ($component in @{
+    'Swift-runtime.txt' = 'swift/LICENSE.txt'
+    'Swift-Foundation-runtime.txt' = 'swift-corelibs-foundation/LICENSE'
+    'Swift-Dispatch-runtime.txt' = 'swift-corelibs-libdispatch/LICENSE'
+    'Swift-ICU-runtime.txt' = 'swift-foundation-icu/LICENSE.md'
+}.GetEnumerator()) {
+    $repository, $licensePath = $component.Value -split '/', 2
+    Invoke-WebRequest "https://raw.githubusercontent.com/swiftlang/$repository/swift-6.4.1-RELEASE/$licensePath" -OutFile (Join-Path $licenses $component.Key)
+}
 # vcpkg supplies copyright files including transitive native dependencies.
 $shared = Join-Path $PSScriptRoot 'build/vcpkg_installed/x64-windows/share'
 if (-not (Test-Path $shared)) { throw 'Missing native dependency license directory' }

@@ -24,6 +24,11 @@ Copy-Item (Join-Path $InputRoot 'cli/*') $OutputRoot -Recurse -Force
 Copy-Item (Join-Path $InputRoot 'anisette/*') $OutputRoot -Recurse -Force
 $bin = Join-Path $OutputRoot 'bin'
 Copy-Item (Join-Path $InputRoot 'sdk/*') $bin -Recurse -Force
+# Deploy Swift's transitive DLL imports for every executable, including the
+# separately located macro server. The developer machine's PATH hid missing
+# runtime files in the original distribution.
+& python (Join-Path $PSScriptRoot 'bundle-runtime.py') $OutputRoot
+if ($LASTEXITCODE -ne 0) { throw 'Runtime DLL deployment failed' }
 $required = @('xtool.exe', 'XADIBinary.dll', 'xtool-linker.exe', 'xtool-codesign.exe',
     'xtool-zip.exe', 'xtool-unxip.exe', 'windows-toolset/bin/ld64.lld.exe',
     'windows-toolset/bin/llvm-libtool-darwin.exe', 'windows-toolset/bin/dsymutil.exe',
@@ -59,12 +64,18 @@ $sourceLicenses = @{
     'OpenAppleMacros.txt' = 'https://raw.githubusercontent.com/xtool-org/OpenAppleMacros/4078c0e615d288134fb2453f02616135b2b94d1b/LICENSE.md'
     'OpenAppleMacros-swift-syntax.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-syntax/050f1a346fbbac0ca2cfb15a95274f7bd1cf0ccf6/LICENSE.txt'
     'LDC-runtime.txt' = 'https://raw.githubusercontent.com/ldc-developers/ldc/v1.43.0/LICENSE'
+    'Swift-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift/swift-6.4.1-RELEASE/LICENSE.txt'
+    'Swift-Foundation-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-corelibs-foundation/swift-6.4.1-RELEASE/LICENSE'
+    'Swift-Dispatch-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-corelibs-libdispatch/swift-6.4.1-RELEASE/LICENSE'
+    'Swift-ICU-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-foundation-icu/swift-6.4.1-RELEASE/LICENSE.md'
 }
 foreach ($name in $sourceLicenses.Keys) {
     Invoke-WebRequest $sourceLicenses[$name] -OutFile (Join-Path $licenses $name)
 }
 Copy-Item $Metadata (Join-Path $OutputRoot 'component-builds.json') -Force
 Copy-Item (Join-Path $PSScriptRoot 'README.md') (Join-Path $OutputRoot 'README.md') -Force
+& python (Join-Path $PSScriptRoot 'bundle-runtime.py') $OutputRoot --smoke
+if ($LASTEXITCODE -ne 0) { throw 'Clean-environment runtime checks failed' }
 foreach ($argument in @('--version', '--help')) {
     & (Join-Path $bin 'xtool.exe') $argument
     if ($LASTEXITCODE -ne 0) { throw "Assembled CLI failed $argument" }

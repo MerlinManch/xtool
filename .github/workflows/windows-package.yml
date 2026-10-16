@@ -1,7 +1,7 @@
 name: Native Windows distribution
 on:
   push:
-    paths: ['.github/workflows/windows-package.yml', 'Windows/merge-artifacts.ps1', 'Windows/collect-anisette-licenses.ps1', 'Windows/package.ps1']
+    paths: ['.github/workflows/windows-package.yml', 'Windows/merge-artifacts.ps1', 'Windows/collect-anisette-licenses.ps1', 'Windows/package.ps1', 'Windows/bundle-runtime.py', 'Windows/runtime-tests/**']
   workflow_run:
     workflows: ['Native Windows port']
     types: [completed]
@@ -93,6 +93,11 @@ jobs:
       - name: Collect licenses from the pinned Anisette dependency graph
         shell: pwsh
         run: ./Windows/collect-anisette-licenses.ps1 -LicenseRoot Windows/package-input/anisette/licenses/xadi
+      - name: Test PE import reader
+        shell: pwsh
+        run: |
+          python -m unittest discover -s Windows/runtime-tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime dependency tests failed' }
       - name: Assemble, validate and checksum the native distribution
         shell: pwsh
         run: ./Windows/merge-artifacts.ps1
