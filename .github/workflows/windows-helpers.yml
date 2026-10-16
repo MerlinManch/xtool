@@ -34,6 +34,8 @@ jobs:
       - name: Test Win32 locking and credential protection
         shell: pwsh
         run: |
+          ./Windows/build/Release/xtool-test-symlink-support.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Native symlink prerequisite tests failed' }
           ./Windows/build/Release/xtool-test-support.exe
           if ($LASTEXITCODE -ne 0) { throw 'Win32 support tests failed' }
       - name: Test native WinHTTP WebSockets and cancellation

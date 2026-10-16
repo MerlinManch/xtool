@@ -18,7 +18,12 @@ class DeferredSymlinks {
         if (archive_write_header(disk, entry) < ARCHIVE_OK ||
             archive_write_finish_entry(disk) < ARCHIVE_OK) {
             const char* error = archive_error_string(disk);
-            throw std::runtime_error(error ? error : "Could not create symbolic link");
+            const std::filesystem::path name(archive_entry_pathname_w(entry));
+            const std::filesystem::path target(archive_entry_symlink_w(entry));
+            throw std::runtime_error("Could not restore symbolic link '" + name.u8string() +
+                "' -> '" + target.u8string() + "' (archive error " +
+                std::to_string(archive_errno(disk)) + "): " +
+                (error ? error : "Unknown archive error"));
         }
     }
 #endif

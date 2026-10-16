@@ -5,6 +5,7 @@
 #include "deferred_symlinks.hpp"
 #include "case_sensitive_directories.hpp"
 #include "deferred_file_modes.hpp"
+#include "windows_symlink_support.hpp"
 #include <lzma.h>
 #include <array>
 #include <cerrno>
@@ -105,6 +106,8 @@ public:
 };
 
 static int extract(const fs::path& input, const fs::path& output) {
+    // Fail before reading/decompressing a multi-gigabyte Xcode archive.
+    xtool_windows::requireSymbolicLinks(output);
     Reader xar(archive_read_new());
     check(archive_read_support_format_xar(xar.get()), xar.get());
 #ifdef _WIN32
@@ -171,7 +174,13 @@ int main(int argc, char** argv) {
 #else
         std::setlocale(LC_ALL, "");
 #endif
-        if (argc != 3) throw std::runtime_error("Usage: xtool-unxip <Xcode.xip> <output-directory>");
+        if (argc != 3) throw std::runtime_error(
+            "Usage: xtool-unxip <Xcode.xip> <output-directory> | --check-symlinks <directory>");
+        if (fs::path(argv[1]) == fs::path("--check-symlinks")) {
+            xtool_windows::requireSymbolicLinks(fs::absolute(argv[2]));
+            std::cout << "Windows symbolic-link creation: OK\n";
+            return 0;
+        }
         return extract(fs::absolute(argv[1]), fs::absolute(argv[2]));
     } catch (const std::exception& error) {
         std::cerr << "xtool-unxip: " << error.what() << '\n';
