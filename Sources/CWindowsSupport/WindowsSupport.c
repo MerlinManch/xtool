@@ -42,3 +42,32 @@ void xtool_remove_interrupt_handler(void) {
     SetConsoleCtrlHandler(interrupt_handler, FALSE);
 }
 #endif
+#ifdef _WIN32
+#include <wincrypt.h>
+#include <dpapi.h>
+int xtool_protect_data(const void *data, uint32_t size, void **output, uint32_t *output_size, uint32_t *error) {
+    DATA_BLOB input = {size, (BYTE *)data};
+    DATA_BLOB result = {0};
+    if (!CryptProtectData(&input, L"xtool", NULL, NULL, NULL, CRYPTPROTECT_UI_FORBIDDEN, &result)) {
+        *error = GetLastError();
+        return 0;
+    }
+    *output = result.pbData;
+    *output_size = result.cbData;
+    return 1;
+}
+int xtool_unprotect_data(const void *data, uint32_t size, void **output, uint32_t *output_size, uint32_t *error) {
+    DATA_BLOB input = {size, (BYTE *)data};
+    DATA_BLOB result = {0};
+    if (!CryptUnprotectData(&input, NULL, NULL, NULL, NULL, CRYPTPROTECT_UI_FORBIDDEN, &result)) {
+        *error = GetLastError();
+        return 0;
+    }
+    *output = result.pbData;
+    *output_size = result.cbData;
+    return 1;
+}
+void xtool_release_secret(void *data, uint32_t size) {
+    if (data) { SecureZeroMemory(data, size); LocalFree(data); }
+}
+#endif

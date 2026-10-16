@@ -24,7 +24,13 @@ public protocol KeyValueStorage: Sendable {
 
 private enum KeyValueStorageDependencyKey: DependencyKey {
     static let testValue: KeyValueStorage = UnimplementedKeyValueStorage()
-    static let liveValue: KeyValueStorage = DirectoryStorage()
+    static let liveValue: KeyValueStorage = {
+        #if os(Windows)
+        WindowsProtectedStorage()
+        #else
+        DirectoryStorage()
+        #endif
+    }()
 }
 
 extension DependencyValues {

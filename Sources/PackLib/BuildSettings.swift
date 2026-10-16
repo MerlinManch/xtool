@@ -42,10 +42,15 @@ public struct BuildSettings: Sendable {
         self.triple = triple
         self.buildSystem = if let buildSystem { buildSystem } else { try await .default() }
 
+        #if os(Windows)
+        // SDKROOT locates the Windows SDK for host-side manifest/macro builds.
+        self.sdkEnvironment = [:]
+        #else
         self.sdkEnvironment = [
             // xcrun passes an SDKROOT that messes with our sdk configuration
             "SDKROOT": nil,
         ]
+        #endif
 
         switch self.buildSystem {
         case .swiftPM:

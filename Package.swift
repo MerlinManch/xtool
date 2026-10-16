@@ -99,7 +99,10 @@ let package = Package(
         .package(url: "https://github.com/tuist/XcodeProj.git", from: "9.17.5"),
     ],
     targets: [
-        .target(name: "CWindowsSupport"),
+        .target(
+            name: "CWindowsSupport",
+            linkerSettings: [.linkedLibrary("crypt32", .when(platforms: [.windows]))]
+        ),
         .target(name: "CWindowsADI"),
         .target(
             name: "CXKit",

@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define REQUIRE(value) do { if (!(value)) { fprintf(stderr, "Failed: %s\n", #value); exit(1); } } while (0)
 
@@ -25,6 +26,16 @@ int main(void) {
     REQUIRE(xtool_install_interrupt_handler(&error) != 0);
     REQUIRE(xtool_interrupted() == 0);
     xtool_remove_interrupt_handler();
-    puts("Windows lock and handler smoke tests passed");
+    const char secret[] = "xtool secret test";
+    void *encrypted = NULL, *decrypted = NULL;
+    uint32_t encrypted_size = 0, decrypted_size = 0;
+    REQUIRE(xtool_protect_data(secret, (uint32_t)sizeof(secret), &encrypted, &encrypted_size, &error) != 0);
+    REQUIRE(encrypted_size > sizeof(secret));
+    REQUIRE(xtool_unprotect_data(encrypted, encrypted_size, &decrypted, &decrypted_size, &error) != 0);
+    REQUIRE(decrypted_size == sizeof(secret));
+    REQUIRE(memcmp(decrypted, secret, sizeof(secret)) == 0);
+    xtool_release_secret(encrypted, encrypted_size);
+    xtool_release_secret(decrypted, decrypted_size);
+    puts("Windows locks, handler and DPAPI smoke tests passed");
     return 0;
 }
