@@ -1,0 +1,25 @@
+diff --git a/Sources/CombineSchedulers/Internal/Lock.swift b/Sources/CombineSchedulers/Internal/Lock.swift
+index 889ab94..ce8f9bb 100644
+--- a/Sources/CombineSchedulers/Internal/Lock.swift
++++ b/Sources/CombineSchedulers/Internal/Lock.swift
+@@ -42,6 +42,20 @@
+       os_unfair_lock_unlock(self)
+     }
+   }
++#elseif os(Windows)
++  import Foundation
++
++  final class WindowsSchedulerLock: @unchecked Sendable {
++    private let mutex = NSLock()
++
++    func lock() { mutex.lock() }
++    func unlock() { mutex.unlock() }
++    func tryLock() -> Bool { mutex.try() }
++    // NSLock owns and releases its native Windows synchronization object.
++    func cleanupLock() {}
++  }
++
++  typealias Lock = WindowsSchedulerLock
+ #else
+   import Foundation
+   #if canImport(CoreFoundation)

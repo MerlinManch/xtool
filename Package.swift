@@ -35,6 +35,7 @@ let nativePackages: [Package.Dependency] = [
     .package(path: "Windows/Dependencies/PathKit"),
     .package(path: "Windows/Dependencies/XcodeProj"),
     .package(path: "Windows/Dependencies/swift-issue-reporting"),
+    .package(path: "Windows/Dependencies/combine-schedulers"),
 ]
 #else
 let nativePackages: [Package.Dependency] = [

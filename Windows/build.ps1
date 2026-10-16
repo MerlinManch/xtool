@@ -90,6 +90,7 @@ Initialize-Dependency 'xtool-core' 'f867f9c2aea16ac78ca14d0d2f948b47db0732b4'
 Initialize-Dependency 'zsign' 'f6158be9e62a5ce2a53d72b1a6d880880da956c8'
 Initialize-Dependency 'PathKit' '3bfd2737b700b9a36565a8c94f4ad2b050a5e574' 'https://github.com/kylef/PathKit.git'
 Initialize-Dependency 'XcodeProj' 'aeea2e97376cd69fbdd1c7e68664b79a1a641dde' 'https://github.com/tuist/XcodeProj.git'
+Initialize-Dependency 'combine-schedulers' '114354e8c1667a2edc4993700fb9fa4f90157b56' 'https://github.com/pointfreeco/combine-schedulers.git'
 Initialize-Dependency 'swift-issue-reporting' '75b000cea2ca6d7527a57e1b9cc0bdf21a9abe9f' 'https://github.com/pointfreeco/swift-issue-reporting.git'
 Push-Location $root
 try {

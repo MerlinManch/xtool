@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <iterator>
 #include <cstdint>
@@ -174,7 +175,14 @@ int wmain(int argc, wchar_t** argv) {
 int main(int argc, char** argv) {
 #endif
     try {
+#ifdef _WIN32
+        std::array<wchar_t, 32768> modulePath{};
+        const DWORD length = GetModuleFileNameW(nullptr, modulePath.data(), static_cast<DWORD>(modulePath.size()));
+        if (!length || length >= modulePath.size()) throw std::runtime_error("Could not locate native linker executable");
+        const fs::path directory = fs::path(modulePath.data()).parent_path();
+#else
         const fs::path directory = fs::absolute(argv[0]).parent_path();
+#endif
         std::vector<String> args(argv + 1, argv + argc);
         // Keep all ordinary invocations byte-for-byte, including response files.
         const auto expanded = expandResponse(args);

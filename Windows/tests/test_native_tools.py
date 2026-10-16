@@ -73,6 +73,13 @@ class XIPTests(unittest.TestCase):
                 self.assertEqual((output / 'Xcode.app/ünicode test').read_bytes(), payload)
                 shutil.rmtree(output)
 
+    def test_long_sdk_paths(self):
+        name = 'Xcode.app/' + 'nested SDK directory/' * 20 + 'header.h'
+        cpio = cpio_entry(name, b'long path', inode=2) + cpio_entry('TRAILER!!!', inode=0)
+        result, output = self.extract(xar(pbzx(cpio)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((output / name).read_bytes(), b'long path')
+
     def test_symlink_and_hardlink(self):
         cpio = (cpio_entry('Xcode.app', mode=stat.S_IFDIR | 0o755)
                 + cpio_entry('Xcode.app/original', b'linked', inode=2, links=2)
@@ -168,6 +175,16 @@ class ZIPTests(unittest.TestCase):
         self.assertEqual((output / 'Payload/App.app/App').read_bytes(), (app / 'App').read_bytes())
         self.assertEqual(os.readlink(output / 'Payload/App.app/link'), 'über resource')
 
+    def test_extract_long_bundle_paths(self):
+        archive = self.root / 'long.ipa'
+        name = 'Payload/App.app/' + 'nested resources/' * 20 + 'resource'
+        with zipfile.ZipFile(archive, 'w') as ipa:
+            ipa.writestr(name, 'long path')
+        output = self.root / 'long-output'
+        result = self.invoke('extract', archive, output)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((output / name).read_text(), 'long path')
+
     def test_extract_forward_directory_symlink_and_chain(self):
         archive = self.root / 'framework.ipa'
         with zipfile.ZipFile(archive, 'w') as ipa:
@@ -215,6 +232,15 @@ class LinkerTests(unittest.TestCase):
         args = ['-o', 'space ü/output', '@a response file', 'an object.o', '', 'embedded "quote"', 'C:\\space path\\', 'backslash\\"quote', 'emoji 🔨']
         result = self.run_linker(args)
         self.assertEqual(result.returncode, 23)
+        self.assertEqual(json.loads(result.stdout), args)
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows executable discovery')
+    def test_invocation_through_path_locates_companion_tools(self):
+        args = ['-o', 'output with spaces']
+        environment = dict(os.environ, PATH=str(self.root) + os.pathsep + os.environ.get('PATH', ''))
+        result = subprocess.run(['ld64.lld.exe', *args], cwd=self.root.parent,
+                                env=environment, capture_output=True, text=True, encoding='utf-8')
+        self.assertEqual(result.returncode, 23, result.stderr)
         self.assertEqual(json.loads(result.stdout), args)
 
     def test_relocatable_objects_use_apple_librarian(self):
