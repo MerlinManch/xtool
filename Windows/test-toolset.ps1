@@ -24,7 +24,6 @@ Invoke-Checked $clang @('-target', 'arm64-apple-ios17.0', '-g', '-O0', '-ffreest
 $swiftSource = Join-Path $work 'source.swift'
 $swiftObject = Join-Path $work 'swift object.o'
 @'
-import Builtin
 @_silgen_name("xtool_swift_add")
 public func xtool_swift_add(_ a: Builtin.Int64, _ b: Builtin.Int64) -> Builtin.Int64 {
     return Builtin.add_Int64(a, b)

@@ -105,6 +105,9 @@ static void compress(const fs::path& source, const fs::path& destination) {
 static void extract(const fs::path& source, const fs::path& destination) {
     Reader zip(archive_read_new());
     check(archive_read_support_format_zip(zip.get()), zip.get());
+    // IPA symlink payloads are UTF-8 even when their ASCII entry names do not
+    // cause a ZIP language-encoding flag to be emitted.
+    check(archive_read_set_format_option(zip.get(), "zip", "hdrcharset", "UTF-8"), zip.get());
 #ifdef _WIN32
     check(archive_read_open_filename_w(zip.get(), source.c_str(), 65536), zip.get());
 #else
