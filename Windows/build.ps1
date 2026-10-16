@@ -103,6 +103,7 @@ Initialize-Dependency 'XcodeProj' 'aeea2e97376cd69fbdd1c7e68664b79a1a641dde' 'ht
 Initialize-Dependency 'combine-schedulers' '114354e8c1667a2edc4993700fb9fa4f90157b56' 'https://github.com/pointfreeco/combine-schedulers.git'
 Initialize-Dependency 'swift-issue-reporting' '75b000cea2ca6d7527a57e1b9cc0bdf21a9abe9f' 'https://github.com/pointfreeco/swift-issue-reporting.git'
 Initialize-Dependency 'swift-docc-plugin' '647c708be89f834fa6a6d4945442793a77ddf5b6' 'https://github.com/swiftlang/swift-docc-plugin.git'
+Initialize-Dependency 'swift-openapi-generator' '39d49cf22abab58a07f02bb76808b5d2839b294a' 'https://github.com/apple/swift-openapi-generator.git'
 # Git for Windows commonly checks out directory symlinks as text placeholders.
 # Materialize the shared sources in our prepared dependency, leaving SwiftPM's
 # managed checkouts untouched and retaining both DocC commands on Windows.
@@ -112,6 +113,15 @@ foreach ($plugin in @('Swift-DocC Convert', 'Swift-DocC Preview')) {
     New-Item -ItemType Directory -Force $sharedSources | Out-Null
     Copy-Item (Join-Path $docc 'Sources/SwiftDocCPluginUtilities') $sharedSources -Recurse -Force
     Copy-Item (Join-Path $docc 'Plugins/SharedPackagePluginExtensions') $sharedSources -Recurse -Force
+}
+$openapi = Join-Path $PSScriptRoot 'Dependencies/swift-openapi-generator'
+foreach ($plugin in @('OpenAPIGenerator', 'OpenAPIGeneratorCommand')) {
+    $sharedSources = Join-Path $openapi "Plugins/$plugin/WindowsSources"
+    New-Item -ItemType Directory -Force $sharedSources | Out-Null
+    foreach ($source in @('Plugins/PluginsShared/PluginError.swift', 'Plugins/PluginsShared/PluginUtils.swift',
+        'Sources/_OpenAPIGeneratorCore/GeneratorMode.swift', 'Sources/swift-openapi-generator/PluginSource.swift')) {
+        Copy-Item (Join-Path $openapi $source) $sharedSources -Force
+    }
 }
 Push-Location $root
 $previousPath = $env:PATH
@@ -179,7 +189,7 @@ try {
             Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)([._-].*)?$' } |
             Copy-Item -Destination $destination -Force
     }
-    foreach ($name in @('xtool-core', 'zsign', 'PathKit', 'XcodeProj', 'swift-issue-reporting', 'combine-schedulers', 'swift-docc-plugin')) {
+    foreach ($name in @('xtool-core', 'zsign', 'PathKit', 'XcodeProj', 'swift-issue-reporting', 'combine-schedulers', 'swift-docc-plugin', 'swift-openapi-generator')) {
         $destination = Join-Path $licenseRoot $name
         New-Item -ItemType Directory -Force $destination | Out-Null
         Get-ChildItem (Join-Path $PSScriptRoot "Dependencies/$name") -File |

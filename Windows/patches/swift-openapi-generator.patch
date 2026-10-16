@@ -1,0 +1,39 @@
+diff --git a/Package.swift b/Package.swift
+index 679ab3b..0bc8114 100644
+--- a/Package.swift
++++ b/Package.swift
+@@ -15,6 +15,12 @@
+ import Foundation
+ import PackageDescription
+ 
++#if os(Windows)
++let sharedPluginExclusions = ["PluginsShared"]
++#else
++let sharedPluginExclusions: [String] = []
++#endif
++
+ let package = Package(
+     name: "swift-openapi-generator",
+     platforms: [
+@@ -116,7 +122,10 @@ let package = Package(
+         ),
+ 
+         // Build Plugin
+-        .plugin(name: "OpenAPIGenerator", capability: .buildTool(), dependencies: ["swift-openapi-generator"]),
++        .plugin(
++            name: "OpenAPIGenerator", capability: .buildTool(),
++            dependencies: ["swift-openapi-generator"], exclude: sharedPluginExclusions
++        ),
+ 
+         // Command Plugin
+         .plugin(
+@@ -132,7 +141,8 @@ let package = Package(
+                     )
+                 ]
+             ),
+-            dependencies: ["swift-openapi-generator"]
++            dependencies: ["swift-openapi-generator"],
++            exclude: sharedPluginExclusions
+         ),
+     ]
+ )

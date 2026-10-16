@@ -37,6 +37,7 @@ let nativePackages: [Package.Dependency] = [
     .package(path: "Windows/Dependencies/swift-issue-reporting"),
     .package(path: "Windows/Dependencies/combine-schedulers"),
     .package(path: "Windows/Dependencies/swift-docc-plugin"),
+    .package(path: "Windows/Dependencies/swift-openapi-generator"),
 ]
 #else
 let nativePackages: [Package.Dependency] = [
@@ -47,6 +48,7 @@ let nativePackages: [Package.Dependency] = [
     .package(url: "https://github.com/kylef/PathKit", from: "1.0.1"),
     .package(url: "https://github.com/tuist/XcodeProj.git", from: "9.17.5"),
     .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.6.0"),
 ]
 #endif
 
@@ -90,7 +92,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-certificates", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-crypto", from: "5.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
-        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.6.0"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-nio", from: "2.77.0"),

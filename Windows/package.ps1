@@ -25,7 +25,7 @@ foreach ($dependency in Get-ChildItem $shared -Directory) {
         Copy-Item $copyright (Join-Path $licenses ($dependency.Name + '.txt')) -Force
     }
 }
-foreach ($dependency in @('xtool-core', 'zsign', 'PathKit', 'XcodeProj', 'swift-issue-reporting', 'combine-schedulers', 'swift-docc-plugin', 'llvm-project', 'OpenAppleMacros')) {
+foreach ($dependency in @('xtool-core', 'zsign', 'PathKit', 'XcodeProj', 'swift-issue-reporting', 'combine-schedulers', 'swift-docc-plugin', 'swift-openapi-generator', 'llvm-project', 'OpenAppleMacros')) {
     $source = Join-Path $PSScriptRoot "Dependencies/$dependency"
     $license = @('LICENSE', 'LICENSE.txt', 'LICENSE.md', 'llvm/LICENSE.TXT') |
         ForEach-Object { Join-Path $source $_ } | Where-Object { Test-Path $_ } | Select-Object -First 1
@@ -52,7 +52,7 @@ Copy-Item (Join-Path $PSScriptRoot 'README.md') (Join-Path $dist 'README.md') -F
 $revision = & git -C $root rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify packaged source revision' }
 $components = @{}
-foreach ($name in @('xtool-core', 'zsign', 'PathKit', 'XcodeProj', 'swift-issue-reporting', 'combine-schedulers', 'swift-docc-plugin', 'xadi', 'llvm-project', 'OpenAppleMacros')) {
+foreach ($name in @('xtool-core', 'zsign', 'PathKit', 'XcodeProj', 'swift-issue-reporting', 'combine-schedulers', 'swift-docc-plugin', 'swift-openapi-generator', 'xadi', 'llvm-project', 'OpenAppleMacros')) {
     $componentRevision = & git -C (Join-Path $PSScriptRoot "Dependencies/$name") rev-parse HEAD
     if ($LASTEXITCODE -ne 0) { throw "Cannot identify $name source revision" }
     $components[$name] = $componentRevision
