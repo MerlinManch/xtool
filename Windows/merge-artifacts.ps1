@@ -57,6 +57,8 @@ foreach ($requiredLicense in @('native', 'swift', 'xadi/LICENSE', 'patches')) {
 $sourceLicenses = @{
     'llvm-project.txt' = 'https://raw.githubusercontent.com/kabiroberai/llvm-project/7ae80f745b07d2c99733b09dccf27bf68a1b271c/llvm/LICENSE.TXT'
     'OpenAppleMacros.txt' = 'https://raw.githubusercontent.com/xtool-org/OpenAppleMacros/4078c0e615d288134fb2453f02616135b2b94d1b/LICENSE.md'
+    'OpenAppleMacros-swift-syntax.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-syntax/050f1a346fbbac0ca2cfb15a95274f7bd1cf0ccf6/LICENSE.txt'
+    'LDC-runtime.txt' = 'https://raw.githubusercontent.com/ldc-developers/ldc/v1.43.0/LICENSE'
 }
 foreach ($name in $sourceLicenses.Keys) {
     Invoke-WebRequest $sourceLicenses[$name] -OutFile (Join-Path $licenses $name)

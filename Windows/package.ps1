@@ -44,6 +44,7 @@ foreach ($checkoutRoot in @((Join-Path $root '.build/checkouts'),
         } | Copy-Item -Destination $destination -Force
     }
 }
+& (Join-Path $PSScriptRoot 'collect-anisette-licenses.ps1') -LicenseRoot (Join-Path $licenses 'xadi')
 if (-not (Test-Path (Join-Path $licenses 'xadi/LICENSE'))) {
     throw 'Missing XADI license and native runtime build record; run build-anisette.ps1'
 }
