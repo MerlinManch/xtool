@@ -111,7 +111,7 @@ struct SDKBuilder {
     func buildSDK() async throws {
         let sdkVersion = Self.currentSDKVersion
 
-        try? FileManager.default.removeItem(at: output)
+        try? FileManager.default.removeOwnedTree(at: output)
         do {
             try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         } catch {
@@ -594,7 +594,7 @@ struct SDKBuilder {
 
         if let cleanupStageDir {
             print("[Cleaning up]")
-            try FileManager.default.removeItem(at: cleanupStageDir)
+            try FileManager.default.removeOwnedTree(at: cleanupStageDir)
         }
 
         print("[Finalizing SDKs]")
@@ -644,7 +644,7 @@ struct SDKBuilder {
             let bin = platformDir.appendingPathComponent("Developer/usr/bin")
             let pluginServer = bin.appendingPathComponent("swift-plugin-server\(HostPlatform.executableSuffix)")
             try? FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
-            try? FileManager.default.removeItem(at: pluginServer)
+            try? FileManager.default.removeOwnedTree(at: pluginServer)
             try FileManager.default.createSymbolicLink(
                 atPath: pluginServer.path,
                 withDestinationPath: "../../../../../../OpenAppleMacrosServer\(HostPlatform.executableSuffix)"
@@ -660,13 +660,13 @@ struct SDKBuilder {
                 // The iPhoneSimulator platform doesn't contain plugins; Xcode seems to be hardcoded
                 // to look at the ones from iPhoneOS.platform. We can symlink the iPhoneOS ones too.
                 try? FileManager.default.createDirectory(at: hostDir, withIntermediateDirectories: true)
-                try? FileManager.default.removeItem(at: pluginsDir)
+                try? FileManager.default.removeOwnedTree(at: pluginsDir)
                 try FileManager.default.createSymbolicLink(
                     atPath: pluginsDir.path,
                     withDestinationPath: "../../../../../../iPhoneOS.platform/Developer/usr/lib/swift/host/plugins"
                 )
             } else {
-                try? FileManager.default.removeItem(at: pluginsDir)
+                try? FileManager.default.removeOwnedTree(at: pluginsDir)
                 try FileManager.default.createDirectory(at: pluginsDir, withIntermediateDirectories: true)
                 // create a lib*.so file for each macro 'library' that we support.
                 // the files are stubs (empty) because we just need them to convince swiftc that
@@ -685,7 +685,7 @@ struct SDKBuilder {
 
         // we copy over the host's clang resorurce dir during install, because intrinsics can differ
         // by LLVM version
-        try FileManager.default.removeItem(
+        try FileManager.default.removeOwnedTree(
             at: dev.appending(path: "Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/clang/include")
         )
 
@@ -712,7 +712,7 @@ struct SDKBuilder {
             throw Console.Error("Unrecognized xip layout: missing \(missing)")
         }
         for child in contents where !expectedChildren.contains(child.lastPathComponent) {
-            try FileManager.default.removeItem(at: child)
+            try FileManager.default.removeOwnedTree(at: child)
         }
     }
 

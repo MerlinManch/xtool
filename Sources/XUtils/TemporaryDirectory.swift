@@ -45,7 +45,7 @@ package struct TemporaryDirectory: ~Copyable {
 
     private func _delete() {
         guard !Self.debugTmp else { return }
-        try? FileManager.default.removeItem(at: base)
+        try? FileManager.default.removeOwnedTree(at: base)
     }
 
     package consuming func persist(at location: URL) throws {
@@ -146,7 +146,7 @@ private struct TemporaryDirectoryRoot {
                 let basename = lock.lastPathComponent
                 if basename.hasPrefix("tmp-") {
                     // legacy tmpdir, remove it
-                    try? FileManager.default.removeItem(at: lock)
+                    try? FileManager.default.removeOwnedTree(at: lock)
                     continue
                 }
                 guard basename.hasPrefix("pid-") && basename.hasSuffix(".lock") else { continue }
@@ -158,7 +158,7 @@ private struct TemporaryDirectoryRoot {
                     // we could be killed after the lock was removed but before the dir was
                     // removed and therefore leave it hanging around.
                     do {
-                        try FileManager.default.removeItem(at: lock.deletingPathExtension())
+                        try FileManager.default.removeOwnedTree(at: lock.deletingPathExtension())
                     } catch CocoaError.fileNoSuchFile {
                         // pass
                     }
@@ -167,7 +167,7 @@ private struct TemporaryDirectoryRoot {
                     try lockFD.close()
                     lockIsOpen = false
                     #endif
-                    try FileManager.default.removeItem(at: lock)
+                    try FileManager.default.removeOwnedTree(at: lock)
                 }
             } catch {
                 // continue

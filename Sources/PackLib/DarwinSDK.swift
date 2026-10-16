@@ -24,7 +24,7 @@ public struct DarwinSDK {
         }
 
         deinit {
-            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeOwnedTree(at: url)
         }
     }
 
@@ -92,7 +92,7 @@ public struct DarwinSDK {
         try FileManager.default.createDirectory(at: sdksDirectory, withIntermediateDirectories: true)
         let bundle = sdksDirectory.appendingPathComponent("darwin.artifactbundle.tmp", isDirectory: true)
         if FileManager.default.fileExists(atPath: bundle.path) {
-            try FileManager.default.removeItem(at: bundle)
+            try FileManager.default.removeOwnedTree(at: bundle)
         }
         return TemporaryBundle(url: bundle)
     }
@@ -127,6 +127,6 @@ public struct DarwinSDK {
     }
 
     public func remove() throws {
-        try FileManager.default.removeItem(at: bundle)
+        try FileManager.default.removeOwnedTree(at: bundle)
     }
 }

@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import plistlib
 import struct
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -113,11 +114,25 @@ class CLITests(unittest.TestCase):
         config = self.root / 'isolated-config'
         env['XDG_CONFIG_HOME'] = str(config)
         installed = config / 'swiftpm/swift-sdks/darwin.artifactbundle'
+        # Simulate an interrupted XIP extraction before invoking sdk install.
+        # Both stale cleanup and update/remove must handle readonly payloads.
+        stale = installed.with_name('darwin.artifactbundle.tmp')
+        stale_file = stale / 'Xcode.app/Contents/usr/share/man/Algorithm__Diff.3pm'
+        stale_file.parent.mkdir(parents=True)
+        stale_file.write_text('interrupted extraction')
+        stale_file.chmod(stat.S_IREAD)
+        (stale_file.parent / 'readonly-alias').symlink_to(Path(stale_file.name))
+        (stale_file.parent / 'dangling').symlink_to(Path('absent'))
+        decoy = self.root / stale_file.name
+        decoy.write_text('CWD decoy')
         for args in [('sdk', 'install', str(app)), ('sdk', 'update')]:
             result = self.invoke(*args, env=env)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             marker = installed / 'Developer/Platforms/iPhoneOS.platform/Developer/Library/Frameworks/Testing.framework/marker'
             self.assertEqual(marker.read_text(), 'Testing')
+            self.assertEqual(decoy.read_text(), 'CWD decoy')
+            self.assertFalse(stale.exists())
+            marker.chmod(stat.S_IREAD)
             header_root = installed / 'Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/Example.framework/Headers'
             self.assertEqual((header_root / 'example.h').read_text(), 'header')
             self.assertEqual((header_root / 'Example.h').read_text(), 'uppercase header')

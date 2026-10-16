@@ -1,5 +1,6 @@
 #if os(Windows)
 import Foundation
+import WinSDK
 
 @main enum FileOperationsSmoke {
     struct Failure: Swift.Error, CustomStringConvertible {
@@ -13,7 +14,7 @@ import Foundation
     static func main() throws {
         let manager = FileManager.default
         let root = manager.temporaryDirectory.appendingPathComponent("xtool native files ü " + UUID().uuidString)
-        defer { try? manager.removeItem(at: root) }
+        defer { try? manager.removeWindowsTree(at: root) }
         let source = root.appendingPathComponent("source")
         let headers = source.appendingPathComponent("Versions/A/Headers")
         try manager.createDirectory(at: headers, withIntermediateDirectories: true)
@@ -53,7 +54,7 @@ import Foundation
         try Data("lower file".utf8).write(to: caseSource.appendingPathComponent("a.h"))
         let caseCopy = root.appendingPathComponent("case-copy")
         try manager.copyWindowsTree(at: caseSource, to: caseCopy)
-        try manager.removeItem(at: caseSource)
+        try manager.removeWindowsTree(at: caseSource)
         for (path, text) in [
             ("Headers/example.h", "uppercase"), ("headers/example.h", "lowercase"),
             ("A.h", "upper file"), ("a.h", "lower file"),
@@ -77,11 +78,64 @@ import Foundation
                     "Copied SDK directory symlink chain is broken")
         let hardLink = root.appendingPathComponent("hardlink.h")
         try manager.createWindowsHardLink(at: input, to: hardLink)
-        try manager.removeItem(at: source)
+        try manager.removeWindowsTree(at: source)
         try require(try Data(contentsOf: hardLink) == contents, "NTFS hardlink depended on its original path")
         try require(try Data(contentsOf: alias.appendingPathComponent("example.h")) == contents,
                     "Copied SDK still depended on its original tree")
         print("Native Swift file reads, NTFS hardlinks and directory-symlink copying passed")
+
+        // A failed XIP extraction leaves readonly files and links in the
+        // temporary SDK. Cleanup must ignore READONLY without mutating another
+        // hardlink, traversing directory links, or touching a same-named CWD file.
+        let stale = root.appendingPathComponent("darwin.artifactbundle.tmp")
+        let nested = stale.appendingPathComponent("Xcode.app/Contents/usr/share/man")
+        try manager.createDirectory(at: nested, withIntermediateDirectories: true)
+        let protected = nested.appendingPathComponent("Algorithm__Diff.3pm")
+        try Data("retained hardlink".utf8).write(to: protected)
+        let retained = root.appendingPathComponent("retained.3pm")
+        try manager.createWindowsHardLink(at: protected, to: retained)
+        try require(protected.path.withCString(encodedAs: UTF16.self) {
+            SetFileAttributesW($0, DWORD(FILE_ATTRIBUTE_READONLY))
+        }, "Could not make the regression file readonly")
+        try manager.createSymbolicLink(atPath: nested.appendingPathComponent("readonly-alias").path,
+                                       withDestinationPath: "Algorithm__Diff.3pm")
+        try manager.createSymbolicLink(atPath: nested.appendingPathComponent("dangling").path,
+                                       withDestinationPath: "missing-target")
+        let external = root.appendingPathComponent("external")
+        try manager.createDirectory(at: external, withIntermediateDirectories: false)
+        let outside = external.appendingPathComponent("keep")
+        try Data("outside".utf8).write(to: outside)
+        try manager.createSymbolicLink(atPath: stale.appendingPathComponent("directory-link").path,
+                                       withDestinationPath: external.path)
+        var deep = stale
+        for index in 0..<10 {
+            deep.appendPathComponent("long Unicode ü path \(index) " + String(repeating: "x", count: 30))
+            try manager.createDirectory(at: deep, withIntermediateDirectories: false)
+        }
+        try Data("long path".utf8).write(to: deep.appendingPathComponent("readonly.3pm"))
+        try require(deep.appendingPathComponent("readonly.3pm").path.withCString(encodedAs: UTF16.self) {
+            SetFileAttributesW($0, DWORD(FILE_ATTRIBUTE_READONLY))
+        }, "Could not make the long-path file readonly")
+        let cwd = manager.currentDirectoryPath
+        let decoy = root.appendingPathComponent("Algorithm__Diff.3pm")
+        try Data("CWD decoy".utf8).write(to: decoy)
+        try require(manager.changeCurrentDirectoryPath(root.path), "Could not change regression CWD")
+        defer { _ = manager.changeCurrentDirectoryPath(cwd) }
+        try manager.removeWindowsTree(at: stale)
+        try require(!manager.fileExists(atPath: stale.path), "Failed SDK tree survived cleanup")
+        try require(try Data(contentsOf: retained) == Data("retained hardlink".utf8),
+                    "Removing SDK changed retained hardlink data")
+        let attributes = retained.path.withCString(encodedAs: UTF16.self) { GetFileAttributesW($0) }
+        try require(attributes != INVALID_FILE_ATTRIBUTES && attributes & DWORD(FILE_ATTRIBUTE_READONLY) != 0,
+                    "Removing SDK changed readonly attributes of retained hardlink")
+        try require(try Data(contentsOf: outside) == Data("outside".utf8),
+                    "Cleanup traversed an external directory symlink")
+        try require(try Data(contentsOf: decoy) == Data("CWD decoy".utf8),
+                    "Cleanup touched a relative CWD path")
+        try manager.removeWindowsTree(at: caseCopy)
+        try require(!manager.fileExists(atPath: caseCopy.path), "Case-distinct files survived cleanup")
+        print("Readonly SDK cleanup, retained hardlinks, symlinks, long Unicode paths and CWD isolation passed")
+
     }
 }
 #endif
