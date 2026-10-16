@@ -738,9 +738,9 @@ struct SDKBuilder {
         try await Subprocess.run(
             .path(try HostPlatform.bundledTool("xtool-unxip")),
             arguments: [URL(fileURLWithPath: inputPath).path, outDir],
+            platformOptions: .withGracefulShutDown,
             output: .currentStandardOutput,
             error: .currentStandardError,
-            platformOptions: .withGracefulShutDown,
         ).checkSuccess()
         guard let entries = FileManager.default.enumerator(atPath: outDir) else {
             throw Console.Error("Could not enumerate extracted Xcode archive")

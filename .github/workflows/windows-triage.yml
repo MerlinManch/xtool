@@ -1,16 +1,17 @@
 name: Native Windows semantic checks
 on:
   push:
-    paths: ['.github/workflows/windows-triage.yml']
+    paths: ['Sources/**', 'Tests/**', 'Package.swift', 'Windows/build.ps1', 'Windows/patches/**', '.github/workflows/windows-triage.yml']
   workflow_dispatch:
 concurrency:
   group: windows-semantic-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   semantic:
     runs-on: windows-2022
     timeout-minutes: 40
     env:
+      XTOOL_VERSION: ${{ github.sha }}
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/Windows/binary-cache
     steps:
       - uses: actions/checkout@v4
