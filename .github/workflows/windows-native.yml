@@ -61,11 +61,14 @@ jobs:
           cl /nologo /W4 /WX /c /ISources/CWindowsSupport/include Sources/CWindowsSupport/WindowsSupport.c /FoWindows/build/WindowsSupport.obj
           if ($LASTEXITCODE -ne 0) { throw 'Win32 support compilation failed' }
       - uses: actions/cache/restore@v4
+        id: swift_cache
         if: ${{ !cancelled() }}
         with:
           path: .build
           key: windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
-          restore-keys: windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-
+          restore-keys: |
+            windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-
+            windows-swift-6.4.1-
       - name: Build and test complete Swift CLI
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -76,10 +79,10 @@ jobs:
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
           ./Windows/build.ps1 -RunTests -VcpkgRoot "$env:VCPKG_INSTALLATION_ROOT"
       - uses: actions/cache/save@v4
-        if: always()
+        if: ${{ !cancelled() && steps.swift_cache.outputs.cache-primary-key != '' }}
         with:
           path: .build
-          key: windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          key: ${{ steps.swift_cache.outputs.cache-primary-key }}
       - uses: actions/cache/save@v4
         if: always()
         with:

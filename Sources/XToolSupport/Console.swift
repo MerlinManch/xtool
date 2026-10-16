@@ -36,7 +36,7 @@ enum Console {
         try FileHandle.standardOutput.write(contentsOf: Data(message.utf8))
         let console = GetStdHandle(STD_INPUT_HANDLE)
         var mode: DWORD = 0
-        if GetConsoleMode(console, &mode) != 0 {
+        if GetConsoleMode(console, &mode) {
             return try readWindowsConsoleLine()
         }
         return try readRedirectedLine()
@@ -70,7 +70,7 @@ enum Console {
             if HostPlatform.interrupted { throw CancellationError() }
             var buffer = [UInt16](repeating: 0, count: 1024)
             var count: DWORD = 0
-            guard ReadConsoleW(console, &buffer, 1024, &count, nil) != 0 else {
+            guard ReadConsoleW(console, &buffer, 1024, &count, nil) else {
                 if HostPlatform.interrupted { throw CancellationError() }
                 throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()))
             }
@@ -125,9 +125,9 @@ enum Console {
         let console = GetStdHandle(STD_INPUT_HANDLE)
         var oldMode: DWORD = 0
         // Redirected input has no console mode; no echo is generated there.
-        let isConsole = GetConsoleMode(console, &oldMode) != 0
+        let isConsole = GetConsoleMode(console, &oldMode)
         if isConsole {
-            guard SetConsoleMode(console, oldMode & ~DWORD(ENABLE_ECHO_INPUT)) != 0 else {
+            guard SetConsoleMode(console, oldMode & ~DWORD(ENABLE_ECHO_INPUT)) else {
                 throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()))
             }
         }
