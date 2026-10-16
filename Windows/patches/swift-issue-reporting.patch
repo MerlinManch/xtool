@@ -1,11 +1,27 @@
-diff --git a/Sources/IssueReporting/Symbolic Links/IssueReportingPackageSupport b/Sources/IssueReporting/Symbolic Links/IssueReportingPackageSupport
-deleted file mode 120000
-index b5da27a..0000000
---- a/Sources/IssueReporting/Symbolic Links/IssueReportingPackageSupport	
-+++ /dev/null
-@@ -1 +0,0 @@
--../../IssueReportingPackageSupport
-\ No newline at end of file
+diff --git a/Package.swift b/Package.swift
+index 57f78e9..623182b 100644
+--- a/Package.swift
++++ b/Package.swift
+@@ -23,7 +23,8 @@ let package = Package(
+   ],
+   targets: [
+     .target(
+-      name: "IssueReporting"
++      name: "IssueReporting",
++      exclude: ["Symbolic Links"]
+     ),
+     .testTarget(
+       name: "IssueReportingTests",
+@@ -39,7 +40,8 @@ let package = Package(
+       ]
+     ),
+     .target(
+-      name: "IssueReportingTestSupport"
++      name: "IssueReportingTestSupport",
++      exclude: ["Symbolic Links"]
+     ),
+   ],
+   swiftLanguageModes: [.v6]
 diff --git a/Sources/IssueReporting/_Test.swift b/Sources/IssueReporting/_Test.swift
 new file mode 100644
 index 0000000..81819f5
@@ -26,14 +42,6 @@ index 0000000..81819f5
 +    self.traits = traits
 +  }
 +}
-diff --git a/Sources/IssueReportingTestSupport/Symbolic Links/IssueReportingPackageSupport b/Sources/IssueReportingTestSupport/Symbolic Links/IssueReportingPackageSupport
-deleted file mode 120000
-index b5da27a..0000000
---- a/Sources/IssueReportingTestSupport/Symbolic Links/IssueReportingPackageSupport	
-+++ /dev/null
-@@ -1 +0,0 @@
--../../IssueReportingPackageSupport
-\ No newline at end of file
 diff --git a/Sources/IssueReportingTestSupport/_Test.swift b/Sources/IssueReportingTestSupport/_Test.swift
 new file mode 100644
 index 0000000..81819f5
