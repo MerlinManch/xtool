@@ -1,36 +1,49 @@
 name: Native Windows CLI integration
 on:
-  push:
-    paths: ['Windows/cli-tests/**', 'Windows/tests/FileOperationsSmoke.swift', 'Windows/test-file-operations.ps1', 'Sources/XUtils/WindowsFileOperations.swift', '.github/workflows/windows-cli-integration.yml']
+  workflow_run:
+    workflows: ['Native Windows port']
+    types: [completed]
   workflow_dispatch:
     inputs:
       diagnostic_run:
         description: Semantic-check run containing a built native CLI
-        default: '38889534145'
-        required: true
+        required: false
 permissions:
   contents: read
   actions: read
 jobs:
   integration:
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository) }}
     runs-on: windows-2022
     steps:
       - uses: actions/github-script@v7
         id: source
         env:
-          XTOOL_DIAGNOSTIC_RUN: ${{ inputs.diagnostic_run || '38889534145' }}
+          XTOOL_DIAGNOSTIC_RUN: ${{ inputs.diagnostic_run }}
         with:
           script: |
-            const run_id = Number(process.env.XTOOL_DIAGNOSTIC_RUN);
+            let run = context.payload.workflow_run;
+            if (!run && process.env.XTOOL_DIAGNOSTIC_RUN) {
+              run = (await github.rest.actions.getWorkflowRun({ ...context.repo,
+                run_id: Number(process.env.XTOOL_DIAGNOSTIC_RUN) })).data;
+            }
+            if (!run) {
+              const branch = context.ref.replace('refs/heads/', '');
+              run = (await github.rest.actions.listWorkflowRuns({ ...context.repo,
+                workflow_id: 'windows-native.yml', branch, status: 'success', per_page: 1 })).data.workflow_runs[0];
+            }
+            const run_id = run?.id;
             if (!Number.isSafeInteger(run_id) || run_id <= 0) throw new Error('Invalid workflow run ID');
-            const { data: run } = await github.rest.actions.getWorkflowRun({ ...context.repo, run_id });
             const { data } = await github.rest.actions.listWorkflowRunArtifacts({ ...context.repo, run_id });
-            const artifact = data.artifacts.find(a => a.name.startsWith('xtool-windows-diagnostic-') && !a.expired);
+            const artifact = data.artifacts.find(a =>
+              (a.name === 'xtool-windows-native-x64' || a.name.startsWith('xtool-windows-diagnostic-')) && !a.expired);
             if (!artifact) throw new Error('No native diagnostic CLI artifact in selected run');
             core.setOutput('run', run_id);
             core.setOutput('sha', run.head_sha);
             core.setOutput('artifact', artifact.name);
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: ${{ steps.source.outputs.artifact }}
