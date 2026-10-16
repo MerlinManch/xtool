@@ -15,7 +15,7 @@ foreach ($file in $required) {
 }
 $licenses = Join-Path $dist 'licenses'
 New-Item -ItemType Directory -Force $licenses | Out-Null
-Copy-Item (Join-Path $root 'LICENSE') (Join-Path $licenses 'xtool.txt') -Force
+Copy-Item (Join-Path $root 'LICENSE.md') (Join-Path $licenses 'xtool.txt') -Force
 # vcpkg supplies copyright files including transitive native dependencies.
 $shared = Join-Path $PSScriptRoot 'build/vcpkg_installed/x64-windows/share'
 if (-not (Test-Path $shared)) { throw 'Missing native dependency license directory' }
@@ -32,13 +32,37 @@ foreach ($dependency in @('xtool-core', 'zsign', 'PathKit', 'llvm-project', 'Ope
     if (-not $license) { throw "Missing source license for $dependency" }
     Copy-Item $license (Join-Path $licenses "$dependency.txt") -Force
 }
+# Include licenses of Swift packages linked into the CLI and macro server.
+foreach ($checkoutRoot in @((Join-Path $root '.build/checkouts'),
+    (Join-Path $PSScriptRoot 'Dependencies/OpenAppleMacros/.build/checkouts'))) {
+    if (-not (Test-Path $checkoutRoot)) { continue }
+    foreach ($checkout in Get-ChildItem $checkoutRoot -Directory) {
+        $destination = Join-Path $licenses "swift/$($checkout.Name)"
+        New-Item -ItemType Directory -Force $destination | Out-Null
+        Get-ChildItem $checkout.FullName -File | Where-Object {
+            $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)([._-].*)?$'
+        } | Copy-Item -Destination $destination -Force
+    }
+}
+if (-not (Test-Path (Join-Path $licenses 'xadi/LICENSE'))) {
+    throw 'Missing XADI license and native runtime build record; run build-anisette.ps1'
+}
+Copy-Item (Join-Path $root 'Package.resolved') $dist -Force
 Copy-Item (Join-Path $PSScriptRoot 'README.md') (Join-Path $dist 'README.md') -Force
 $revision = & git -C $root rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify packaged source revision' }
+$components = @{}
+foreach ($name in @('xtool-core', 'zsign', 'PathKit', 'xadi', 'llvm-project', 'OpenAppleMacros')) {
+    $componentRevision = & git -C (Join-Path $PSScriptRoot "Dependencies/$name") rev-parse HEAD
+    if ($LASTEXITCODE -ne 0) { throw "Cannot identify $name source revision" }
+    $components[$name] = $componentRevision
+}
+$components['vcpkg'] = (Get-Content (Join-Path $PSScriptRoot 'vcpkg.json') -Raw | ConvertFrom-Json).'builtin-baseline'
 @{
+    components = $components
     repository = 'https://github.com/MerlinManch/xtool'
     revision = $revision
-    architecture = 'x86_64-pc-windows-msvc'
+    architecture = 'x86_64-unknown-windows-msvc'
     swift = (& swift --version | Out-String).Trim()
 } | ConvertTo-Json | Set-Content (Join-Path $dist 'build-info.json') -Encoding utf8
 $archive = Join-Path $PSScriptRoot 'xtool-windows-x64.zip'

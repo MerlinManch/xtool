@@ -87,8 +87,8 @@ macOS simulator commands retain their upstream platform restrictions.
 
 ## Validation
 
-Three independent Windows workflows build/test the CLI and native dependencies,
-the Anisette runtime, and the SDK host tools. Separating them avoids restarting
+Independent Windows workflows build/test the CLI and native dependencies,
+the Anisette runtime, the macro server and the SDK host tools. Separating them avoids restarting
 the long LLVM build when a CLI or Anisette fix changes.
 
 Verified so far:
@@ -96,7 +96,8 @@ Verified so far:
 - Native Windows Anisette DLL builds and passes export/error-boundary tests.
   The public Apple Music APK's x86_64 libraries initialize successfully; Android
   ID, provisioning directory and unprovisioned-login calls cross the ABI boundary.
-- 15 native helper tests pass on Linux: response-file forwarding, exit status,
+- 15 native helper tests and the Win32 lock/DPAPI tests pass on Windows.
+  The expanded 17-test archive suite also passes on Linux: response-file forwarding, exit status,
   raw/compressed PBZX, Unicode, hard/symbolic links, executable modes, malformed
   archives, traversal and symlink escapes. Windows execution is in CI.
 - Windows PathKit branches pass semantic compilation and functional normalization/
@@ -106,7 +107,8 @@ Verified so far:
 
 Pending Windows CI results and integration coverage:
 
-- Complete CLI build and `swift test`, native helper and Win32 primitive tests.
+- Complete CLI build and `swift test`, HTTP/WebSocket loopback tests, project
+  creation/redirected console tests and a synthetic Windows SDK integration test.
 - LLVM and macro server build, real Xcode SDK install/update/remove and example
   compilation including SwiftUI macros and SwiftBuild/BSP.
 - Apple ID/2FA, ASC keys, account provisioning and real-device USB/network

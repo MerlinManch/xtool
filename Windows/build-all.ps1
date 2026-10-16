@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if (-not $IsWindows) { throw 'Use PowerShell 7 on native Windows.' }
-foreach ($program in @('swift', 'cmake', 'git', 'dub', 'ldc2', 'mt.exe')) {
+foreach ($program in @('swift', 'cmake', 'git', 'dub', 'ldc2', 'mt.exe', 'python')) {
     if (-not (Get-Command $program -ErrorAction SilentlyContinue)) {
         throw "Missing build prerequisite: $program. See Windows/README.md."
     }
