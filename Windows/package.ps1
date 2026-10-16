@@ -23,6 +23,8 @@ Copy-Item (Join-Path $root 'LICENSE.md') (Join-Path $licenses 'xtool.txt') -Forc
 foreach ($component in @{
     'Swift-runtime.txt' = 'swift/LICENSE.txt'
     'Swift-Foundation-runtime.txt' = 'swift-corelibs-foundation/LICENSE'
+    'Swift-Foundation-Essentials-runtime.txt' = 'swift-foundation/LICENSE.md'
+    'Swift-Foundation-Essentials-NOTICE.txt' = 'swift-foundation/NOTICE.txt'
     'Swift-Dispatch-runtime.txt' = 'swift-corelibs-libdispatch/LICENSE'
     'Swift-ICU-runtime.txt' = 'swift-foundation-icu/LICENSE.md'
 }.GetEnumerator()) {

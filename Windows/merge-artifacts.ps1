@@ -66,6 +66,8 @@ $sourceLicenses = @{
     'LDC-runtime.txt' = 'https://raw.githubusercontent.com/ldc-developers/ldc/v1.43.0/LICENSE'
     'Swift-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift/swift-6.4.1-RELEASE/LICENSE.txt'
     'Swift-Foundation-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-corelibs-foundation/swift-6.4.1-RELEASE/LICENSE'
+    'Swift-Foundation-Essentials-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-foundation/swift-6.4.1-RELEASE/LICENSE.md'
+    'Swift-Foundation-Essentials-NOTICE.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-foundation/swift-6.4.1-RELEASE/NOTICE.txt'
     'Swift-Dispatch-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-corelibs-libdispatch/swift-6.4.1-RELEASE/LICENSE'
     'Swift-ICU-runtime.txt' = 'https://raw.githubusercontent.com/swiftlang/swift-foundation-icu/swift-6.4.1-RELEASE/LICENSE.md'
 }
