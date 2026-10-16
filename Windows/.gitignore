@@ -8,3 +8,5 @@
 
 /anisette-tests/__pycache__/
 /xtool-windows-*.zip
+
+/cli-tests/__pycache__/

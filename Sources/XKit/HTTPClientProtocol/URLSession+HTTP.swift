@@ -24,7 +24,7 @@ extension HTTPClientDependencyKey: DependencyKey {
 private struct Client: HTTPClientProtocol {
     final class ClientDelegate: NSObject, URLSessionWebSocketDelegate {
         let webSocketCallbacks = LockIsolated<[
-            URLSessionWebSocketTask: @Sendable (URLSessionWebSocketTask.CloseCode?) -> Void
+            URLSessionWebSocketTask: @Sendable (Result<Void, any Error>) -> Void
         ]>([:])
 
         func urlSession(
@@ -32,7 +32,7 @@ private struct Client: HTTPClientProtocol {
             webSocketTask: URLSessionWebSocketTask,
             didOpenWithProtocol protocol: String?
         ) {
-            webSocketCallbacks.withValue { $0.removeValue(forKey: webSocketTask) }?(nil)
+            webSocketCallbacks.withValue { $0.removeValue(forKey: webSocketTask) }?(.success(()))
         }
 
         func urlSession(
@@ -41,7 +41,14 @@ private struct Client: HTTPClientProtocol {
             didCloseWith closeCode: URLSessionWebSocketTask.CloseCode,
             reason: Data?
         ) {
-            webSocketCallbacks.withValue { $0.removeValue(forKey: webSocketTask) }?(closeCode)
+            webSocketCallbacks.withValue { $0.removeValue(forKey: webSocketTask) }?(.failure(Errors.webSocketClosed(closeCode)))
+        }
+
+        func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
+            guard let task = task as? URLSessionWebSocketTask else { return }
+            webSocketCallbacks.withValue { $0.removeValue(forKey: task) }?(
+                .failure(error ?? URLError(.networkConnectionLost))
+            )
         }
 
         func urlSession(
@@ -86,16 +93,28 @@ private struct Client: HTTPClientProtocol {
 
     public func makeWebSocket(url: URL) async throws -> any WebSocketSession {
         let task = session.webSocketTask(with: url)
-        let (event, eventContinuation) = AsyncStream<URLSessionWebSocketTask.CloseCode?>.makeStream()
-        clientDelegate.webSocketCallbacks.withValue {
-            $0[task] = {
-                eventContinuation.yield($0)
-                eventContinuation.finish()
+        let (events, continuation) = AsyncThrowingStream<Void, any Error>.makeStream()
+        let delegate = clientDelegate
+        delegate.webSocketCallbacks.withValue {
+            $0[task] = { result in
+                switch result {
+                case .success:
+                    continuation.yield(())
+                    continuation.finish()
+                case .failure(let error):
+                    continuation.finish(throwing: error)
+                }
             }
         }
         task.resume()
-        let code = await event.first { _ in true } ?? nil
-        if let code { throw Errors.webSocketClosed(code) }
+        try await withTaskCancellationHandler {
+            for try await _ in events { break }
+            try Task.checkCancellation()
+        } onCancel: {
+            delegate.webSocketCallbacks.withValue { $0.removeValue(forKey: task) }
+            task.cancel()
+            continuation.finish(throwing: CancellationError())
+        }
         return WebSocketSessionWrapper(task: task)
     }
 

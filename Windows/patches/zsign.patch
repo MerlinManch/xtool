@@ -1,5 +1,5 @@
 diff --git a/Package.swift b/Package.swift
-index a1d8fbf..f112572 100644
+index a1d8fbf..811efa5 100644
 --- a/Package.swift
 +++ b/Package.swift
 @@ -2,6 +2,12 @@
@@ -15,7 +15,7 @@ index a1d8fbf..f112572 100644
  let package = Package(
      name: "zsign",
      platforms: [
-@@ -24,24 +30,32 @@ let package = Package(
+@@ -24,26 +30,34 @@ let package = Package(
                  .product(name: "OpenSSL", package: "xtool-core"),
                  .product(name: "SignerSupport", package: "xtool-core")
              ],
@@ -64,6 +64,9 @@ index a1d8fbf..f112572 100644
              ]
          ),
      ],
+-    cxxLanguageStandard: .cxx11
++    cxxLanguageStandard: .cxx17
+ )
 diff --git a/build/windows/vs2022/zsign/src/common_win32.h b/build/windows/vs2022/zsign/src/common_win32.h
 index ea9a15b..ed25127 100644
 --- a/build/windows/vs2022/zsign/src/common_win32.h

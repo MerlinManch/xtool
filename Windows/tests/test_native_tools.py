@@ -84,6 +84,18 @@ class XIPTests(unittest.TestCase):
         self.assertEqual((output / 'Xcode.app/hardlink').read_bytes(), b'linked')
         self.assertEqual(os.readlink(output / 'Xcode.app/symlink'), 'original')
 
+    def test_forward_directory_symlink_and_chain(self):
+        cpio = (cpio_entry('Xcode.app', mode=stat.S_IFDIR | 0o755)
+                + cpio_entry('Xcode.app/Headers', b'Current/Headers', mode=stat.S_IFLNK | 0o777, inode=2)
+                + cpio_entry('Xcode.app/Current', b'Versions/A', mode=stat.S_IFLNK | 0o777, inode=3)
+                + cpio_entry('Xcode.app/Versions/A/Headers', mode=stat.S_IFDIR | 0o755, inode=4)
+                + cpio_entry('Xcode.app/Versions/A/Headers/test.h', b'header', inode=5)
+                + cpio_entry('TRAILER!!!', inode=0))
+        result, output = self.extract(xar(pbzx(cpio)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((output / 'Xcode.app/Headers').is_dir())
+        self.assertEqual((output / 'Xcode.app/Headers/test.h').read_bytes(), b'header')
+
     def test_exact_chunk_boundary(self):
         cpio = cpio_entry('test', b'hello') + cpio_entry('TRAILER!!!', inode=0)
         cpio += b'\0' * (1024 - len(cpio))
@@ -155,6 +167,21 @@ class ZIPTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((output / 'Payload/App.app/App').read_bytes(), (app / 'App').read_bytes())
         self.assertEqual(os.readlink(output / 'Payload/App.app/link'), 'über resource')
+
+    def test_extract_forward_directory_symlink_and_chain(self):
+        archive = self.root / 'framework.ipa'
+        with zipfile.ZipFile(archive, 'w') as ipa:
+            for name, target in [('Headers', 'Current/Headers'), ('Current', 'Versions/A')]:
+                link = zipfile.ZipInfo('Framework/' + name)
+                link.create_system = 3
+                link.external_attr = (stat.S_IFLNK | 0o777) << 16
+                ipa.writestr(link, target)
+            ipa.writestr('Framework/Versions/A/Headers/test.h', 'header')
+        output = self.root / 'framework-output'
+        result = self.invoke('extract', archive, output)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((output / 'Framework/Headers').is_dir())
+        self.assertEqual((output / 'Framework/Headers/test.h').read_text(), 'header')
 
     def test_extraction_rejects_parent_traversal(self):
         archive = self.root / 'bad.ipa'

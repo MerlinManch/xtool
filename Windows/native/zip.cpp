@@ -1,6 +1,7 @@
 // Native IPA archive handling with Unix executable and symlink attributes.
 #include <archive.h>
 #include <archive_entry.h>
+#include "deferred_symlinks.hpp"
 #include <array>
 #include <clocale>
 #include <filesystem>
@@ -112,13 +113,17 @@ static void extract(const fs::path& source, const fs::path& destination) {
         ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS), disk.get());
     fs::create_directories(destination);
     fs::current_path(destination);
+    DeferredSymlinks symlinks;
     archive_entry* entry = nullptr;
     for (;;) {
         const auto status = archive_read_next_header(zip.get(), &entry);
         if (status == ARCHIVE_EOF) break;
         check(status, zip.get());
-        check(archive_read_extract2(zip.get(), entry, disk.get()), zip.get());
+        if (!symlinks.defer(entry)) {
+            check(archive_read_extract2(zip.get(), entry, disk.get()), zip.get());
+        }
     }
+    symlinks.finish(disk.get());
     check(archive_write_close(disk.get()), disk.get());
 }
 #ifdef _WIN32

@@ -110,11 +110,36 @@ try {
     Get-ChildItem (Join-Path $NativeDependencyRoot 'bin') -Filter '*.dll' | Copy-Item -Destination $dist -Force
     Get-ChildItem $binPath -Filter '*.dll' | Copy-Item -Destination $dist -Force
     if ($RunTests) {
-        Invoke-Checked swift (@('test') + $swiftOptions)
+        $portFile = Join-Path $build 'http-test-port.txt'
+        Remove-Item $portFile -ErrorAction SilentlyContinue
+        $serverInfo = [System.Diagnostics.ProcessStartInfo]::new('python')
+        $serverInfo.UseShellExecute = $false
+        $serverInfo.ArgumentList.Add((Join-Path $PSScriptRoot 'cli-tests/http_server.py'))
+        $serverInfo.ArgumentList.Add($portFile)
+        $server = [System.Diagnostics.Process]::Start($serverInfo)
+        try {
+            for ($attempt = 0; $attempt -lt 100 -and -not (Test-Path $portFile); $attempt++) {
+                if ($server.HasExited) { throw 'Loopback HTTP fixture exited early' }
+                Start-Sleep -Milliseconds 100
+            }
+            if (-not (Test-Path $portFile)) { throw 'Loopback HTTP fixture did not start' }
+            $env:XTOOL_HTTP_TEST_URL = "http://127.0.0.1:$((Get-Content $portFile -Raw).Trim())"
+            Invoke-Checked swift (@('test') + $swiftOptions)
+        } finally {
+            if (-not $server.HasExited) { $server.Kill() }
+            $server.Dispose()
+            Remove-Item Env:XTOOL_HTTP_TEST_URL -ErrorAction SilentlyContinue
+            Remove-Item $portFile -ErrorAction SilentlyContinue
+        }
         foreach ($command in @('', 'setup', 'auth', 'sdk', 'new', 'dev', 'ds', 'devices', 'install', 'uninstall', 'launch')) {
             $helpArgs = if ($command) { @($command, '--help') } else { @('--help') }
             Invoke-Checked (Join-Path $dist 'xtool.exe') $helpArgs
         }
+    }
+    if ($RunTests) {
+        $env:XTOOL_CLI = Join-Path $dist 'xtool.exe'
+        Invoke-Checked python @('-m', 'unittest', 'discover', '-s',
+            (Join-Path $PSScriptRoot 'cli-tests'), '-v')
     }
     Write-Host "Native build output: $dist"
 } finally { Pop-Location }

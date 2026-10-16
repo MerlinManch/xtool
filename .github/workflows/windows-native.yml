@@ -1,9 +1,9 @@
 name: Native Windows port
 on:
   push:
-    paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
+    paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/cli-tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
   pull_request:
-    paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
+    paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/cli-tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
   workflow_dispatch:
 concurrency:
   group: windows-native-${{ github.ref }}
@@ -60,6 +60,12 @@ jobs:
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
           cl /nologo /W4 /WX /c /ISources/CWindowsSupport/include Sources/CWindowsSupport/WindowsSupport.c /FoWindows/build/WindowsSupport.obj
           if ($LASTEXITCODE -ne 0) { throw 'Win32 support compilation failed' }
+      - uses: actions/cache/restore@v4
+        if: ${{ !cancelled() }}
+        with:
+          path: .build
+          key: windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-
       - name: Build and test complete Swift CLI
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -69,6 +75,11 @@ jobs:
           Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
           ./Windows/build.ps1 -RunTests -VcpkgRoot "$env:VCPKG_INSTALLATION_ROOT"
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .build
+          key: windows-swift-6.4.1-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
       - uses: actions/cache/save@v4
         if: always()
         with:
