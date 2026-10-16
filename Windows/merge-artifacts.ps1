@@ -91,7 +91,11 @@ Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-ar
 $previousMacro = $env:XTOOL_NATIVE_MACRO_SERVER
 $previousAnisette = $env:XTOOL_ANISETTE_DLL
 $previousNativeBin = $env:XTOOL_NATIVE_BIN
+$previousCLI = $env:XTOOL_CLI
 try {
+    $env:XTOOL_CLI = Join-Path $bin 'xtool.exe'
+    & python -m unittest discover -s (Join-Path $PSScriptRoot 'runtime-tests') -p test_sdk_cleanup.py -v
+    if ($LASTEXITCODE -ne 0) { throw 'Assembled readonly SDK cleanup tests failed' }
     # Exercise the archive helpers from the assembled distribution, including
     # Xcode's case-distinct CPIO hardlinks, before publishing this ZIP.
     $env:XTOOL_NATIVE_BIN = $bin
@@ -107,6 +111,7 @@ try {
     $env:XTOOL_NATIVE_MACRO_SERVER = $previousMacro
     $env:XTOOL_ANISETTE_DLL = $previousAnisette
     $env:XTOOL_NATIVE_BIN = $previousNativeBin
+    $env:XTOOL_CLI = $previousCLI
 }
 $archive = "$OutputRoot.zip"
 Compress-Archive -Path (Join-Path $OutputRoot '*') -DestinationPath $archive -Force

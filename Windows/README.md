@@ -136,7 +136,11 @@ Verified on native Windows:
   verify locks, hardlinks and relocated directory-link chains.
 - CLI integration creates projects, checks native BSP configuration, accepts
   redirected UTF-8 input and builds/installs/updates/removes a synthetic SDK on
-  NTFS. Source Xcode metadata remains unchanged.
+  NTFS. Source Xcode metadata remains unchanged. SDK cleanup uses native deletion
+  handles with absolute long paths, without following directory symlinks or
+  clearing read-only attributes shared with surviving hardlinks. Regression
+  fixtures include interrupted extraction, read-only manpages, dangling links,
+  case-distinct names and long Unicode paths.
 - Native LLVM tools compile C and Swift Builtin code into arm64 iOS Mach-O,
   link dylibs, create Apple static archives and produce DWARF debug symbols.
   The real `-r` trampoline is exercised with the native Apple librarian.
@@ -187,4 +191,6 @@ CLI must produce help/version output with only Windows System32 on PATH, from
 an unrelated working directory. The macro protocol and installed-SDK symlink
 tests also run in that environment. The assembled archive helpers must pass the
 XIP/IPA suite, including the case-distinct Xcode manpage regression, before the
-ZIP is published.
+ZIP is published. The assembled CLI also removes read-only SDK trees and
+cleans an interrupted extraction before validating the next install input,
+with only Windows System32 on PATH.
