@@ -48,6 +48,23 @@ $baseline = $manifest.'builtin-baseline'
 if ($LASTEXITCODE -ne 0) {
     Invoke-Checked git @('-C', $VcpkgRoot, 'fetch', '--depth=1', 'origin', $baseline)
 }
+# Use a detached worktree for the pinned registry as vcpkg reads version indexes
+# from its working HEAD, not merely from objects fetched for builtin-baseline.
+$currentVcpkgRevision = & git -C $VcpkgRoot rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Could not inspect vcpkg revision' }
+if ($currentVcpkgRevision -ne $baseline) {
+    $pinnedRoot = Join-Path $PSScriptRoot 'Dependencies/vcpkg'
+    if (-not (Test-Path $pinnedRoot)) {
+        Invoke-Checked git @('-C', $VcpkgRoot, 'worktree', 'add', '--detach', $pinnedRoot, $baseline)
+    }
+    $actual = & git -C $pinnedRoot rev-parse HEAD
+    if ($LASTEXITCODE -ne 0 -or $actual -ne $baseline) { throw 'Pinned vcpkg worktree has an unexpected revision' }
+    if (-not (Test-Path (Join-Path $pinnedRoot 'vcpkg.exe'))) {
+        Invoke-Checked (Join-Path $pinnedRoot 'bootstrap-vcpkg.bat') @('-disableMetrics')
+    }
+    $VcpkgRoot = $pinnedRoot
+    $toolchain = Join-Path $VcpkgRoot 'scripts/buildsystems/vcpkg.cmake'
+}
 $cmakeConfiguration = if ($Configuration -eq 'release') { 'Release' } else { 'Debug' }
 $triplet = "$Architecture-windows"
 New-Item -ItemType Directory -Force $build, $dist | Out-Null
