@@ -112,10 +112,11 @@ struct SDKBuilder {
         let sdkVersion = Self.currentSDKVersion
 
         try? FileManager.default.removeItem(at: output)
-        try FileManager.default.createDirectory(
-            at: output,
-            withIntermediateDirectories: true
-        )
+        do {
+            try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        } catch {
+            throw Console.Error("Could not create SDK directory '\(output.path)': \(error)")
+        }
 
         // TODO: parallelize these three steps
         // we need to synchronize progress reporting though

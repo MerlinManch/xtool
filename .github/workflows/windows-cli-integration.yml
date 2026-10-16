@@ -31,8 +31,6 @@ jobs:
             core.setOutput('sha', run.head_sha);
             core.setOutput('artifact', artifact.name);
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.source.outputs.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: ${{ steps.source.outputs.artifact }}
@@ -58,3 +56,43 @@ jobs:
           }
           python -m unittest discover -s Windows/cli-tests -v
           if ($LASTEXITCODE -ne 0) { throw 'Native CLI lifecycle integration failed' }
+      - name: Diagnose native Foundation SDK path operations
+        if: failure()
+        shell: pwsh
+        run: |
+          $source = @'
+          import Foundation
+          let manager = FileManager.default
+          let root = URL(fileURLWithPath: CommandLine.arguments[1])
+              .appendingPathComponent("xtool path ü " + UUID().uuidString)
+          defer { try? manager.removeItem(at: root) }
+          func describe(_ label: String, _ url: URL) {
+              print(label, "URL:", url.absoluteString, "path:", url.path, "last:", url.lastPathComponent)
+          }
+          describe("root", root)
+          try manager.createDirectory(at: root, withIntermediateDirectories: true)
+          let reconstructed = URL(fileURLWithPath: root.path, isDirectory: true)
+          for (name, url) in [("new", reconstructed.appending(path: "new")),
+                              ("old", reconstructed.appendingPathComponent("old"))] {
+              describe(name, url)
+              do { try manager.createDirectory(at: url, withIntermediateDirectories: true); print("mkdir OK") }
+              catch { print("mkdir ERROR:", error) }
+          }
+          let file = root.appendingPathComponent("source.exe")
+          try Data([1, 2, 3]).write(to: file)
+          for child in try manager.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) {
+              describe("enumerated", child)
+              if child.lastPathComponent == "source.exe" {
+                  let destination = root.appendingPathComponent("copy.exe")
+                  do { try manager.copyItem(at: child, to: destination); print("copy OK") }
+                  catch { print("copy ERROR:", error) }
+              }
+          }
+          '@
+          $probe = Join-Path $env:RUNNER_TEMP 'xtool-path-probe.swift'
+          $executable = Join-Path $env:RUNNER_TEMP 'xtool-path-probe.exe'
+          Set-Content $probe $source -Encoding utf8
+          swiftc $probe -o $executable
+          if ($LASTEXITCODE -ne 0) { throw 'Path probe compilation failed' }
+          & $executable $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0) { throw 'Path probe failed' }

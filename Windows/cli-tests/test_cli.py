@@ -18,9 +18,13 @@ class CLITests(unittest.TestCase):
         self.cli = Path(os.environ['XTOOL_CLI']).resolve()
 
     def invoke(self, *args, input=None, env=None):
-        return subprocess.run([self.cli, *args], cwd=self.root, input=input,
-                              capture_output=True, text=True, encoding='utf-8',
-                              env=env, timeout=180)
+        # Supply exact UTF-8 bytes: text mode would turn explicit CRLF input
+        # into CRCRLF on Windows before the CLI sees it.
+        result = subprocess.run([self.cli, *args], cwd=self.root,
+                                input=input.encode('utf-8') if input is not None else None,
+                                capture_output=True, env=env, timeout=180)
+        return subprocess.CompletedProcess(result.args, result.returncode,
+                                           result.stdout.decode('utf-8'), result.stderr.decode('utf-8'))
 
     def test_new_project_and_native_build_server_configuration(self):
         result = self.invoke('new', '--skip-setup', 'Native-App')

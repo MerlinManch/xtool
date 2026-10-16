@@ -16,12 +16,17 @@ extension SDKBuilder {
     }
 
     func installWindowsToolset(in output: URL) throws {
+        print("[Installing native Windows toolset]")
         let source = try windowsResource("XTOOL_WINDOWS_TOOLSET", defaultName: "windows-toolset")
         let directory = output.appendingPathComponent("toolset")
         for name in ["ld64.lld.exe", "llvm-libtool-darwin.exe", "dsymutil.exe"] {
             try requireWindowsExecutable(source.appending(path: "bin/\(name)"))
         }
-        try FileManager.default.copyItem(at: source, to: directory)
+        do {
+            try FileManager.default.copyItem(at: source, to: directory)
+        } catch {
+            throw Console.Error("Could not copy toolset '\(source.path)' to '\(directory.path)': \(error)")
+        }
         let bin = directory.appendingPathComponent("bin")
         let orig = bin.appendingPathComponent("orig")
         try FileManager.default.createDirectory(at: orig, withIntermediateDirectories: true)
@@ -40,12 +45,18 @@ extension SDKBuilder {
     }
 
     func installWindowsMacros(in output: URL) throws {
+        print("[Installing native Windows macro server]")
         let source = try windowsResource("XTOOL_WINDOWS_MACROS", defaultName: "windows-macros")
         let executable = source.appendingPathComponent("OpenAppleMacrosServer.exe")
         try requireWindowsExecutable(executable)
         // Keep companion Swift runtime DLLs beside the macro server.
         for file in try FileManager.default.contentsOfDirectory(at: source, includingPropertiesForKeys: nil) {
-            try FileManager.default.copyItem(at: file, to: output.appendingPathComponent(file.lastPathComponent))
+            let destination = output.appendingPathComponent(file.lastPathComponent)
+            do {
+                try FileManager.default.copyItem(at: file, to: destination)
+            } catch {
+                throw Console.Error("Could not copy macro resource '\(file.path)' to '\(destination.path)': \(error)")
+            }
         }
     }
 
