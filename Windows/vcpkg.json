@@ -2,7 +2,21 @@
   "name": "xtool-windows-helpers",
   "version-string": "1.0.0",
   "dependencies": [
-    { "name": "libarchive", "default-features": false, "features": ["lzma", "xar", "crypto"] },
-    "liblzma"
-  ]
+    {
+      "name": "libarchive",
+      "default-features": false,
+      "features": [
+        "lzma",
+        "xar",
+        "crypto"
+      ]
+    },
+    "liblzma",
+    "openssl",
+    "libplist",
+    "libusbmuxd",
+    "libimobiledevice-glue",
+    "libimobiledevice"
+  ],
+  "builtin-baseline": "3cd21e48a75f67acfef289da52893ce79144aaa1"
 }

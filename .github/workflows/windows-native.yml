@@ -1,15 +1,19 @@
-name: Native Windows helpers
+name: Native Windows port
 on:
   push:
-    paths: ['Windows/**', 'Sources/CWindowsSupport/**', '.github/workflows/windows-native.yml']
+    paths: ['Windows/**', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
   pull_request:
-    paths: ['Windows/**', 'Sources/CWindowsSupport/**', '.github/workflows/windows-native.yml']
+    paths: ['Windows/**', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
   workflow_dispatch:
 jobs:
   helpers:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+      - uses: compnerd/gha-setup-swift@86d1ddeaf915c282137601aeb0654ea0e7b7f17e
+        with:
+          swift-version: swift-6.4.1-release
+          swift-build: 6.4.1-RELEASE
       - name: Build native helpers
         shell: pwsh
         run: ./Windows/build.ps1 -HelpersOnly -VcpkgRoot "$env:VCPKG_INSTALLATION_ROOT"
@@ -33,7 +37,15 @@ jobs:
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
           cl /nologo /W4 /WX /c /ISources/CWindowsSupport/include Sources/CWindowsSupport/WindowsSupport.c /FoWindows/build/WindowsSupport.obj
           if ($LASTEXITCODE -ne 0) { throw 'Win32 support compilation failed' }
+      - name: Build and test complete Swift CLI
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -property installationPath
+          Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          ./Windows/build.ps1 -RunTests -VcpkgRoot "$env:VCPKG_INSTALLATION_ROOT"
       - uses: actions/upload-artifact@v4
         with:
-          name: xtool-windows-native-helpers-x64
+          name: xtool-windows-native-x64
           path: Windows/dist/bin/

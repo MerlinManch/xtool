@@ -6,7 +6,8 @@ param(
     # Prefix with native MSVC-compatible OpenSSL, plist, usbmuxd,
     # libimobiledevice-glue and libimobiledevice headers/import libraries/DLLs.
     [string]$NativeDependencyRoot = $env:XTOOL_NATIVE_DEPENDENCIES,
-    [switch]$HelpersOnly
+    [switch]$HelpersOnly,
+    [switch]$RunTests
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -55,7 +56,10 @@ Get-ChildItem (Join-Path $build $cmakeConfiguration) -Filter '*.dll' |
 
 if ($HelpersOnly) { return }
 if (-not $NativeDependencyRoot) {
-    throw 'Set XTOOL_NATIVE_DEPENDENCIES to the native device/OpenSSL library prefix. See Windows/README.md.'
+    $NativeDependencyRoot = Join-Path $build "vcpkg_installed/$triplet"
+}
+if (-not (Test-Path (Join-Path $NativeDependencyRoot 'include/libimobiledevice/libimobiledevice.h'))) {
+    throw "Native libimobiledevice headers missing in $NativeDependencyRoot"
 }
 Initialize-Dependency 'xtool-core' 'f867f9c2aea16ac78ca14d0d2f948b47db0732b4'
 Initialize-Dependency 'zsign' 'f6158be9e62a5ce2a53d72b1a6d880880da956c8'
@@ -63,15 +67,15 @@ Push-Location $root
 try {
     $include = Join-Path $NativeDependencyRoot 'include'
     $lib = Join-Path $NativeDependencyRoot 'lib'
-    $swiftArgs = @('build', '-c', $Configuration, '--product', 'xtool',
+    $swiftOptions = @('-c', $Configuration,
         '-Xcc', "-I$include", '-Xcxx', "-I$include", '-Xswiftc', '-I', '-Xswiftc', $include,
         '-Xlinker', "/LIBPATH:$lib")
     # System-library module maps don't specify Windows import-library names.
     foreach ($name in @('libssl', 'libcrypto', 'plist-2.0', 'usbmuxd-2.0', 'imobiledevice-glue-1.0', 'imobiledevice-1.0')) {
         if (-not (Test-Path (Join-Path $lib "$name.lib"))) { throw "Missing native import library $name.lib" }
-        $swiftArgs += @('-Xlinker', "$name.lib")
+        $swiftOptions += @('-Xlinker', "$name.lib")
     }
-    Invoke-Checked swift $swiftArgs
+    Invoke-Checked swift (@('build', '--product', 'xtool') + $swiftOptions)
     $binPath = & swift build -c $Configuration --show-bin-path
     if ($LASTEXITCODE -ne 0) { throw 'Could not locate Swift build output.' }
     Copy-Item (Join-Path $binPath 'xtool.exe') $dist -Force
@@ -79,5 +83,12 @@ try {
         "-outputresource:$(Join-Path $dist 'xtool.exe');1")
     Get-ChildItem (Join-Path $NativeDependencyRoot 'bin') -Filter '*.dll' | Copy-Item -Destination $dist -Force
     Get-ChildItem $binPath -Filter '*.dll' | Copy-Item -Destination $dist -Force
+    if ($RunTests) {
+        Invoke-Checked swift (@('test') + $swiftOptions)
+        foreach ($command in @('', 'setup', 'auth', 'sdk', 'new', 'dev', 'ds', 'devices', 'install', 'uninstall', 'launch')) {
+            $helpArgs = if ($command) { @($command, '--help') } else { @('--help') }
+            Invoke-Checked (Join-Path $dist 'xtool.exe') $helpArgs
+        }
+    }
     Write-Host "Native build output: $dist"
 } finally { Pop-Location }
