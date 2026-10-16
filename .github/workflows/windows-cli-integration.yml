@@ -1,0 +1,59 @@
+name: Native Windows CLI integration
+on:
+  push:
+    paths: ['.github/workflows/windows-cli-integration.yml']
+  workflow_dispatch:
+    inputs:
+      diagnostic_run:
+        description: Semantic-check run containing a built native CLI
+        default: '38889534145'
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  integration:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/github-script@v7
+        id: source
+        env:
+          XTOOL_DIAGNOSTIC_RUN: ${{ inputs.diagnostic_run || '38889534145' }}
+        with:
+          script: |
+            const run_id = Number(process.env.XTOOL_DIAGNOSTIC_RUN);
+            if (!Number.isSafeInteger(run_id) || run_id <= 0) throw new Error('Invalid workflow run ID');
+            const { data: run } = await github.rest.actions.getWorkflowRun({ ...context.repo, run_id });
+            const { data } = await github.rest.actions.listWorkflowRunArtifacts({ ...context.repo, run_id });
+            const artifact = data.artifacts.find(a => a.name.startsWith('xtool-windows-diagnostic-') && !a.expired);
+            if (!artifact) throw new Error('No native diagnostic CLI artifact in selected run');
+            core.setOutput('run', run_id);
+            core.setOutput('sha', run.head_sha);
+            core.setOutput('artifact', artifact.name);
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source.outputs.artifact }}
+          run-id: ${{ steps.source.outputs.run }}
+          github-token: ${{ github.token }}
+          path: Windows/runtime-test
+      - uses: compnerd/gha-setup-swift@86d1ddeaf915c282137601aeb0654ea0e7b7f17e
+        with:
+          swift-version: swift-6.4.1-release
+          swift-build: 6.4.1-RELEASE
+      - name: Verify CLI commands, project creation and complete synthetic SDK lifecycle
+        shell: pwsh
+        run: |
+          $env:XTOOL_CLI = "$pwd/Windows/runtime-test/bin/xtool.exe"
+          $env:PATH = "$pwd/Windows/runtime-test/bin;$env:PATH"
+          & $env:XTOOL_CLI --version
+          if ($LASTEXITCODE -ne 0) { throw 'Native CLI startup failed' }
+          foreach ($command in @('', 'setup', 'auth', 'sdk', 'new', 'dev', 'ds', 'devices', 'install', 'uninstall', 'launch')) {
+            $helpArgs = if ($command) { @($command, '--help') } else { @('--help') }
+            & $env:XTOOL_CLI @helpArgs
+            if ($LASTEXITCODE -ne 0) { throw "CLI help failed: $command" }
+          }
+          python -m unittest discover -s Windows/cli-tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Native CLI lifecycle integration failed' }
