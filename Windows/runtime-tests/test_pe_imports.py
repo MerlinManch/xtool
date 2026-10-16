@@ -4,6 +4,8 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
 
 
 spec = importlib.util.spec_from_file_location(
@@ -54,6 +56,39 @@ class ImportsTests(unittest.TestCase):
             path.write_bytes(data)
             with self.assertRaisesRegex(ValueError, 'Unmapped RVA'):
                 runtime.imports(path)
+
+
+class SmokeTests(unittest.TestCase):
+    def test_mixed_case_environment_and_isolated_search_path(self):
+        result = SimpleNamespace(returncode=0, stdout='USAGE: xtool\n', stderr='')
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(runtime.os.environ, {
+                'SystemRoot': directory, 'Path': 'C:/Swift/bin;C:/build',
+                'SwiftRuntime': 'C:/Swift/runtime', 'SDKROOT': 'C:/SDK',
+            }, clear=True), patch.object(runtime.subprocess, 'run', return_value=result) as run:
+                runtime.smoke(Path(directory))
+            self.assertEqual(run.call_count, 3)
+            for call in run.call_args_list:
+                environment = call.kwargs['env']
+                self.assertEqual(environment['PATH'], str(Path(directory) / 'System32'))
+                self.assertEqual(environment['SYSTEMROOT'], directory)
+                self.assertNotIn('SWIFTRUNTIME', environment)
+                self.assertNotIn('SDKROOT', environment)
+                self.assertNotEqual(call.kwargs['cwd'], directory)
+
+    def test_empty_output_is_failure_even_with_zero_exit_code(self):
+        result = SimpleNamespace(returncode=0, stdout='', stderr='')
+        with patch.dict(runtime.os.environ, {'SystemRoot': 'C:/Windows'}, clear=True):
+            with patch.object(runtime.subprocess, 'run', return_value=result):
+                with self.assertRaisesRegex(RuntimeError, '0x00000000'):
+                    runtime.smoke(Path('.'))
+
+    def test_missing_dll_status_is_reported_as_hex(self):
+        result = SimpleNamespace(returncode=-1073741515, stdout='', stderr='')
+        with patch.dict(runtime.os.environ, {'SystemRoot': 'C:/Windows'}, clear=True):
+            with patch.object(runtime.subprocess, 'run', return_value=result):
+                with self.assertRaisesRegex(RuntimeError, '0xC0000135'):
+                    runtime.smoke(Path('.'))
 
 
 if __name__ == '__main__':
