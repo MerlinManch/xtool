@@ -175,6 +175,25 @@ class ZIPTests(unittest.TestCase):
         self.assertEqual((output / 'Payload/App.app/App').read_bytes(), (app / 'App').read_bytes())
         self.assertEqual(os.readlink(output / 'Payload/App.app/link'), 'über resource')
 
+    def test_native_symlink_targets_use_posix_separators_in_ipa(self):
+        payload = self.root / 'Payload'
+        app = payload / 'App.app'
+        target = Path('Resources/sub dir/über.bin')
+        (app / target).parent.mkdir(parents=True)
+        (app / target).write_bytes(b'nested resource')
+        (app / 'nested link').symlink_to(target)
+        self.assertEqual((app / 'nested link').read_bytes(), b'nested resource')
+        archive = self.root / 'nested.ipa'
+        result = self.invoke('compress', payload, archive)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with zipfile.ZipFile(archive) as ipa:
+            self.assertEqual(ipa.read('Payload/App.app/nested link'),
+                             'Resources/sub dir/über.bin'.encode('utf-8'))
+        output = self.root / 'nested-output'
+        result = self.invoke('extract', archive, output)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((output / 'Payload/App.app/nested link').read_bytes(), b'nested resource')
+
     def test_extract_long_bundle_paths(self):
         archive = self.root / 'long.ipa'
         name = 'Payload/App.app/' + 'nested resources/' * 20 + 'resource'
