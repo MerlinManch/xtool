@@ -74,8 +74,8 @@ func windowsNativeSigningAndAnalysis(certificateSigning: Bool) async throws {
     let signature = try #require(nativeMachOSignature(signed))
     #expect(Array(signature.prefix(4)) == [0xfa, 0xde, 0x0c, 0xc0])
     if let certificateData {
-        #expect(signature.range(of: Data([0xfa, 0xde, 0x0b, 0x01])) != nil)
-        #expect(signature.range(of: certificateData) != nil)
+        _ = try #require(signature.range(of: Data([0xfa, 0xde, 0x0b, 0x01])))
+        _ = try #require(signature.range(of: certificateData))
     }
     #expect(FileManager.default.fileExists(atPath: app.appendingPathComponent("_CodeSignature/CodeResources").path))
     let extracted = try await signer.analyze(executable: executable)

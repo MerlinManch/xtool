@@ -114,6 +114,10 @@ foreach ($plugin in @('Swift-DocC Convert', 'Swift-DocC Preview')) {
     Copy-Item (Join-Path $docc 'Plugins/SharedPackagePluginExtensions') $sharedSources -Recurse -Force
 }
 Push-Location $root
+$previousPath = $env:PATH
+# SwiftPM runs the test executable in .build, outside the distribution directory.
+# Make the same native DLLs available to both test hosts and CLI subprocesses.
+$env:PATH = "$dist;$(Join-Path $NativeDependencyRoot 'bin');$previousPath"
 try {
     $include = Join-Path $NativeDependencyRoot 'include'
     $lib = Join-Path $NativeDependencyRoot 'lib'
@@ -134,6 +138,7 @@ try {
     Get-ChildItem (Join-Path $NativeDependencyRoot 'bin') -Filter '*.dll' | Copy-Item -Destination $dist -Force
     Get-ChildItem $binPath -Filter '*.dll' | Copy-Item -Destination $dist -Force
     if ($RunTests) {
+        Invoke-Checked (Join-Path $dist 'xtool.exe') @('--version')
         $env:XTOOL_NATIVE_BIN = $dist
         $portFile = Join-Path $build 'http-test-port.txt'
         Remove-Item $portFile -ErrorAction SilentlyContinue
@@ -184,4 +189,7 @@ try {
     Copy-Item (Join-Path $root 'Package.resolved') (Join-Path $PSScriptRoot 'dist/Package.resolved') -Force
     Copy-Item (Join-Path $PSScriptRoot 'patches') $licenseRoot -Recurse -Force
     Write-Host "Native build output: $dist"
-} finally { Pop-Location }
+} finally {
+    $env:PATH = $previousPath
+    Pop-Location
+}
