@@ -197,6 +197,8 @@ let package = Package(
             name: "XToolTests",
             dependencies: [
                 "XUtils",
+                .product(name: "Subprocess", package: "swift-subprocess", condition: .when(platforms: [.windows])),
+                .product(name: "SystemPackage", package: "swift-system", condition: .when(platforms: [.windows])),
                 "XKit",
                 "XToolSupport",
                 "PackLib",
@@ -204,6 +206,7 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "X509", package: "swift-certificates"),
             ],
+            exclude: ["Fixtures"],
             swiftSettings: swiftSettings,
         ),
         .target(

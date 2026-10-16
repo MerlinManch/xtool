@@ -235,11 +235,10 @@ class LinkerTests(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout), args)
 
     @unittest.skipUnless(os.name == 'nt', 'Windows executable discovery')
-    def test_invocation_through_path_locates_companion_tools(self):
+    def test_bare_argv_zero_locates_companion_tools(self):
         args = ['-o', 'output with spaces']
-        environment = dict(os.environ, PATH=str(self.root) + os.pathsep + os.environ.get('PATH', ''))
-        result = subprocess.run(['ld64.lld.exe', *args], cwd=self.root.parent,
-                                env=environment, capture_output=True, text=True, encoding='utf-8')
+        result = subprocess.run(['ld64.lld.exe', *args], executable=self.root / 'ld64.lld.exe',
+                                cwd=self.root.parent, capture_output=True, text=True, encoding='utf-8')
         self.assertEqual(result.returncode, 23, result.stderr)
         self.assertEqual(json.loads(result.stdout), args)
 

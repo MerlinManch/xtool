@@ -79,6 +79,16 @@ Invoke-Checked cmake @('--install', $build, '--config', $cmakeConfiguration)
 Get-ChildItem (Join-Path $build $cmakeConfiguration) -Filter '*.dll' |
     Copy-Item -Destination $dist -Force
 
+$licenseRoot = Join-Path $PSScriptRoot 'dist/licenses'
+$nativeLicenses = Join-Path $licenseRoot 'native'
+New-Item -ItemType Directory -Force $nativeLicenses | Out-Null
+$shared = Join-Path $build "vcpkg_installed/$triplet/share"
+foreach ($port in Get-ChildItem $shared -Directory) {
+    $copyright = Join-Path $port.FullName 'copyright'
+    if (Test-Path $copyright) { Copy-Item $copyright (Join-Path $nativeLicenses "$($port.Name).txt") -Force }
+}
+Copy-Item (Join-Path $root 'LICENSE.md') (Join-Path $licenseRoot 'xtool.md') -Force
+
 if ($HelpersOnly) { return }
 if (-not $NativeDependencyRoot) {
     $NativeDependencyRoot = Join-Path $build "vcpkg_installed/$triplet"
@@ -113,6 +123,7 @@ try {
     Get-ChildItem (Join-Path $NativeDependencyRoot 'bin') -Filter '*.dll' | Copy-Item -Destination $dist -Force
     Get-ChildItem $binPath -Filter '*.dll' | Copy-Item -Destination $dist -Force
     if ($RunTests) {
+        $env:XTOOL_NATIVE_BIN = $dist
         $portFile = Join-Path $build 'http-test-port.txt'
         Remove-Item $portFile -ErrorAction SilentlyContinue
         $serverInfo = [System.Diagnostics.ProcessStartInfo]::new('python')
@@ -144,5 +155,22 @@ try {
         Invoke-Checked python @('-m', 'unittest', 'discover', '-s',
             (Join-Path $PSScriptRoot 'cli-tests'), '-v')
     }
+    $swiftLicenses = Join-Path $licenseRoot 'swift'
+    foreach ($checkout in Get-ChildItem (Join-Path $root '.build/checkouts') -Directory) {
+        $destination = Join-Path $swiftLicenses $checkout.Name
+        New-Item -ItemType Directory -Force $destination | Out-Null
+        Get-ChildItem $checkout.FullName -File |
+            Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)(\\.|$)' } |
+            Copy-Item -Destination $destination -Force
+    }
+    foreach ($name in @('xtool-core', 'zsign', 'PathKit', 'XcodeProj', 'swift-issue-reporting', 'combine-schedulers')) {
+        $destination = Join-Path $licenseRoot $name
+        New-Item -ItemType Directory -Force $destination | Out-Null
+        Get-ChildItem (Join-Path $PSScriptRoot "Dependencies/$name") -File |
+            Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)(\\.|$)' } |
+            Copy-Item -Destination $destination -Force
+    }
+    Copy-Item (Join-Path $root 'Package.resolved') (Join-Path $PSScriptRoot 'dist/Package.resolved') -Force
+    Copy-Item (Join-Path $PSScriptRoot 'patches') $licenseRoot -Recurse -Force
     Write-Host "Native build output: $dist"
 } finally { Pop-Location }

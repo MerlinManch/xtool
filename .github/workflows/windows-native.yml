@@ -7,11 +7,12 @@ on:
   workflow_dispatch:
 concurrency:
   group: windows-native-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   helpers:
     runs-on: windows-2022
     env:
+      XTOOL_VERSION: ${{ github.sha }}
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/Windows/binary-cache
     steps:
       - uses: actions/checkout@v4
@@ -91,4 +92,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: xtool-windows-native-x64
-          path: Windows/dist/bin/
+          path: Windows/dist/
