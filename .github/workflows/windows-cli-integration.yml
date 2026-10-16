@@ -51,7 +51,8 @@ jobs:
           & $env:XTOOL_CLI --version
           if ($LASTEXITCODE -ne 0) { throw 'Native CLI startup failed' }
           foreach ($command in @('', 'setup', 'auth', 'sdk', 'new', 'dev', 'ds', 'devices', 'install', 'uninstall', 'launch')) {
-            $helpArgs = if ($command) { @($command, '--help') } else { @('--help') }
+            $helpArgs = @('--help')
+            if ($command) { $helpArgs = @($command, '--help') }
             & $env:XTOOL_CLI @helpArgs
             if ($LASTEXITCODE -ne 0) { throw "CLI help failed: $command" }
           }

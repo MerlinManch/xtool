@@ -153,7 +153,8 @@ try {
         try {
             Invoke-Checked (Join-Path $dist 'xtool.exe') @('--version')
             foreach ($command in @('', 'setup', 'auth', 'sdk', 'new', 'dev', 'ds', 'devices', 'install', 'uninstall', 'launch')) {
-                $helpArgs = if ($command) { @($command, '--help') } else { @('--help') }
+                $helpArgs = @('--help')
+                if ($command) { $helpArgs = @($command, '--help') }
                 Invoke-Checked (Join-Path $dist 'xtool.exe') $helpArgs
             }
             $env:XTOOL_CLI = Join-Path $dist 'xtool.exe'
