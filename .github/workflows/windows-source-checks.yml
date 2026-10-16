@@ -1,0 +1,21 @@
+name: Windows port source checks
+on:
+  push:
+    paths: ['Sources/**/*.swift', 'Tests/**/*.swift', 'Package.swift', 'Windows/*.ps1', '.github/workflows/windows-source-checks.yml']
+  workflow_dispatch:
+jobs:
+  source-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SwiftLint
+        run: make lint SWIFTLINT_FLAGS=--strict
+      - name: Parse PowerShell build and packaging scripts
+        shell: pwsh
+        run: |
+          foreach ($script in Get-ChildItem Windows/*.ps1) {
+            $tokens = $null
+            $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors) { throw ($parseErrors | Out-String) }
+          }

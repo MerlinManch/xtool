@@ -10,3 +10,6 @@
 /xtool-windows-*.zip
 
 /cli-tests/__pycache__/
+/package-input/
+/delivery/
+/component-builds.json

@@ -160,14 +160,14 @@ try {
         $destination = Join-Path $swiftLicenses $checkout.Name
         New-Item -ItemType Directory -Force $destination | Out-Null
         Get-ChildItem $checkout.FullName -File |
-            Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)(\\.|$)' } |
+            Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)([._-].*)?$' } |
             Copy-Item -Destination $destination -Force
     }
     foreach ($name in @('xtool-core', 'zsign', 'PathKit', 'XcodeProj', 'swift-issue-reporting', 'combine-schedulers')) {
         $destination = Join-Path $licenseRoot $name
         New-Item -ItemType Directory -Force $destination | Out-Null
         Get-ChildItem (Join-Path $PSScriptRoot "Dependencies/$name") -File |
-            Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)(\\.|$)' } |
+            Where-Object { $_.Name -match '^(LICENSE|LICENCE|COPYING|NOTICE)([._-].*)?$' } |
             Copy-Item -Destination $destination -Force
     }
     Copy-Item (Join-Path $root 'Package.resolved') (Join-Path $PSScriptRoot 'dist/Package.resolved') -Force
