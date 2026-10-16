@@ -84,10 +84,50 @@ func windowsNativeSigningAndAnalysis(certificateSigning: Bool) async throws {
     if let certificateData {
         _ = try #require(signature.range(of: Data([0xfa, 0xde, 0x0b, 0x01])))
         _ = try #require(signature.range(of: certificateData))
+        try await verifyNativeCMS(signature, in: root)
     }
     #expect(FileManager.default.fileExists(atPath: app.appendingPathComponent("_CodeSignature/CodeResources").path))
     let extracted = try await signer.analyze(executable: executable)
     #expect(try PropertyListSerialization.propertyList(from: extracted, format: nil) is [String: Any])
+}
+
+private func verifyNativeCMS(_ signature: Data, in root: URL) async throws {
+    let verifier = try #require(ProcessInfo.processInfo.environment["XTOOL_NATIVE_CMS_VERIFIER"])
+    let directory = try #require(nativeSignatureSlot(signature, type: 0))
+    let cms = try #require(nativeSignatureSlot(signature, type: 0x10000))
+    let cmsURL = root.appendingPathComponent("signature.cms")
+    let directoryURL = root.appendingPathComponent("code-directory.bin")
+    try cms.dropFirst(8).write(to: cmsURL)
+    try directory.write(to: directoryURL)
+    try await Subprocess.run(
+        .path(FilePath(verifier)), arguments: .init([cmsURL.path, directoryURL.path]),
+        output: .discarded, error: .currentStandardError
+    ).checkSuccess()
+    var damaged = directory
+    damaged[damaged.count - 1] ^= 1
+    try damaged.write(to: directoryURL)
+    let rejection = try await Subprocess.run(
+        .path(FilePath(verifier)), arguments: .init([cmsURL.path, directoryURL.path]),
+        output: .discarded, error: .discarded
+    )
+    #expect(!rejection.terminationStatus.isSuccess)
+}
+
+private func nativeSignatureSlot(_ data: Data, type: UInt32) -> Data? {
+    guard data.count >= 12 else { return nil }
+    func word(_ offset: Int) -> UInt32 {
+        data.withUnsafeBytes { UInt32(bigEndian: $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self)) }
+    }
+    let count = Int(word(8))
+    guard count <= (data.count - 12) / 8 else { return nil }
+    for index in 0..<count where word(12 + index * 8) == type {
+        let offset = Int(word(16 + index * 8))
+        guard offset <= data.count - 8 else { return nil }
+        let length = Int(word(offset + 4))
+        guard length >= 8, length <= data.count - offset else { return nil }
+        return data.subdata(in: offset..<(offset + length))
+    }
+    return nil
 }
 
 private func nativeMachOSignature(_ data: Data) -> Data? {

@@ -150,6 +150,7 @@ try {
     Get-ChildItem $binPath -Filter '*.dll' | Copy-Item -Destination $dist -Force
     if ($RunTests) {
         $env:XTOOL_NATIVE_BIN = $dist
+        $env:XTOOL_NATIVE_CMS_VERIFIER = Join-Path $build "$cmakeConfiguration/xtool-test-cms.exe"
         $cliTestFailure = $null
         try {
             & (Join-Path $PSScriptRoot 'test-file-operations.ps1')

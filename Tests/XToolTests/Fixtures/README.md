@@ -12,3 +12,9 @@ commit `ef4abf0bdb079b23217f8ecb299b1ea5abf77e43`.
 The workflow exports this ZIP as base64 for reproducible source fixtures.
 The test decodes/extracts it with the native ZIP helper, creates a minimal app,
 signs with the native zsign backend and checks the signature and entitlements.
+
+`wwdr-g3.pem` is the public WWDR G3 certificate embedded in the pinned zsign
+source. The signing test uses its subject as the issuer name of a synthetic
+leaf to exercise zsign's Apple-chain selection. That leaf is locally signed,
+not Apple-issued or Apple-trusted. The independent OpenSSL test checks the CMS
+signature and rejects tampering without claiming to validate Apple trust.
