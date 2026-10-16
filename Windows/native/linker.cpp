@@ -13,12 +13,12 @@
 #include <windows.h>
 #include <process.h>
 using String = std::wstring;
-#define TEXT(value) L##value
+#define XTL_TEXT(value) L##value
 #define EXECUTABLE_SUFFIX L".exe"
 #else
 #include <unistd.h>
 using String = std::string;
-#define TEXT(value) value
+#define XTL_TEXT(value) value
 #define EXECUTABLE_SUFFIX ""
 #endif
 namespace fs = std::filesystem;
@@ -144,9 +144,9 @@ int main(int argc, char** argv) {
         std::vector<String> args(argv + 1, argv + argc);
         // Keep all ordinary invocations byte-for-byte, including response files.
         const auto expanded = expandResponse(args);
-        const bool relocatable = std::find(expanded.begin(), expanded.end(), TEXT("-r")) != expanded.end();
+        const bool relocatable = std::find(expanded.begin(), expanded.end(), XTL_TEXT("-r")) != expanded.end();
         if (!relocatable) {
-            return run(directory / "orig" / TEXT("ld64.lld") EXECUTABLE_SUFFIX, args);
+            return run(directory / "orig" / XTL_TEXT("ld64.lld") EXECUTABLE_SUFFIX, args);
         }
         auto value = [&](const String& option) -> String {
             auto it = std::find(expanded.begin(), expanded.end(), option);
@@ -156,11 +156,11 @@ int main(int argc, char** argv) {
             return *it;
         };
         std::vector<String> librarian = {
-            TEXT("-static"), TEXT("-filelist"), value(TEXT("-filelist")),
-            TEXT("-dependency_info"), value(TEXT("-dependency_info")),
-            TEXT("-o"), value(TEXT("-o"))
+            XTL_TEXT("-static"), XTL_TEXT("-filelist"), value(XTL_TEXT("-filelist")),
+            XTL_TEXT("-dependency_info"), value(XTL_TEXT("-dependency_info")),
+            XTL_TEXT("-o"), value(XTL_TEXT("-o"))
         };
-        return run(directory / TEXT("llvm-lib") EXECUTABLE_SUFFIX, librarian);
+        return run(directory / XTL_TEXT("llvm-lib") EXECUTABLE_SUFFIX, librarian);
     } catch (const std::exception& error) {
         std::cerr << "xtool linker: " << error.what() << '\n';
         return 2;

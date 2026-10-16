@@ -20,7 +20,7 @@ public struct WindowsProtectedStorage: KeyValueStorage {
     }
 
     public func setData(_ data: Data?, forKey key: String) throws {
-        let stored = try data.map { Self.marker + WindowsDataProtection.protect($0) }
+        let stored = try data.map { Self.marker + (try WindowsDataProtection.protect($0)) }
         try storage.setData(stored, forKey: key)
     }
 }

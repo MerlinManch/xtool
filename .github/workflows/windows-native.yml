@@ -18,7 +18,7 @@ jobs:
       - name: Prepare binary cache
         shell: pwsh
         run: New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: Windows/binary-cache
           key: windows-msvc-vcpkg-${{ hashFiles('Windows/vcpkg.json') }}
@@ -57,6 +57,11 @@ jobs:
           Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
           ./Windows/build.ps1 -RunTests -VcpkgRoot "$env:VCPKG_INSTALLATION_ROOT"
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: Windows/binary-cache
+          key: windows-msvc-vcpkg-${{ hashFiles('Windows/vcpkg.json') }}
       - uses: actions/upload-artifact@v4
         with:
           name: xtool-windows-native-x64

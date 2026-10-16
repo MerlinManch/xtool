@@ -1,5 +1,5 @@
 diff --git a/dub.sdl b/dub.sdl
-index ce7321d..f0fb369 100644
+index ce7321d..5905dc1 100644
 --- a/dub.sdl
 +++ b/dub.sdl
 @@ -7,3 +7,9 @@ dependency "provision" repository="git+https://github.com/xtool-org/Provision.gi
@@ -10,7 +10,7 @@ index ce7321d..f0fb369 100644
 +configuration "windows" {
 +    targetType "dynamicLibrary"
 +    targetName "XADIBinary"
-+    dflags "--link-defaultlib-shared=false" platform="windows-ldc"
++    dflags "--link-defaultlib-shared=false" "--dllimport=none" platform="windows-ldc"
 +}
 diff --git a/src/exports.d b/src/exports.d
 index 938ffc9..e4801ad 100644
