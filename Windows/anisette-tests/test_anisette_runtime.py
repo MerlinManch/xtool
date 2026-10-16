@@ -65,6 +65,11 @@ assert runtime.xadi_GetLoginCode(ctypes.c_uint64(-2).value) == -45061
             subprocess.run([sys.executable, '-c', probe,
                             str(Path(os.environ['XTOOL_ANISETTE_DLL']).resolve()),
                             libraries.as_posix(), provision.as_posix()], check=True)
+            if os.environ.get('XTOOL_TEST_APPLE_PROVISIONING') == '1':
+                subprocess.run([sys.executable, str(Path(__file__).with_name('provision.py')),
+                                str(Path(os.environ['XTOOL_ANISETTE_DLL']).resolve()),
+                                libraries.as_posix(), provision.as_posix()], check=True)
+
 
 
 

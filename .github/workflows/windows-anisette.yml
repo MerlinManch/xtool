@@ -34,6 +34,7 @@ jobs:
         run: |
           $env:XTOOL_ANISETTE_DLL = "$pwd/Windows/dist/bin/XADIBinary.dll"
           $env:XTOOL_TEST_APPLE_LIBRARIES = '1'
+          $env:XTOOL_TEST_APPLE_PROVISIONING = '1'
           python -m unittest discover -s Windows/anisette-tests -p test_anisette_runtime.py -v
       - uses: actions/upload-artifact@v4
         with:
