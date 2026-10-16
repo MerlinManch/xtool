@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import shutil
 import struct
 import subprocess
 import unittest
@@ -30,7 +31,12 @@ class MacroProtocolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='xtool installed macro ü ') as directory:
             link = Path(directory) / 'Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server.exe'
             link.parent.mkdir(parents=True)
-            link.symlink_to(Path(os.environ['XTOOL_NATIVE_MACRO_SERVER']).resolve())
+            server = Path(os.environ['XTOOL_NATIVE_MACRO_SERVER']).resolve()
+            # SDKBuilder deploys runtime DLLs beside the invocation symlink:
+            # Windows does not search beside its target for dependent DLLs.
+            for dll in server.parent.glob('*.dll'):
+                shutil.copy2(dll, link.parent / dll.name)
+            link.symlink_to(server)
             self.assert_protocol(link)
 
     def assert_protocol(self, executable):

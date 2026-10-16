@@ -99,6 +99,7 @@ class CLITests(unittest.TestCase):
             self.assertTrue((frameworks / 'Example.framework/Headers').is_symlink())
             self.assertEqual((frameworks / 'Example.framework/Headers/example.h').read_text(), 'header')
             self.assertTrue((base / 'Developer/usr/bin/swift-plugin-server.exe').is_file())
+            self.assertEqual((base / 'Developer/usr/bin/companion.dll').read_bytes(), b'companion resource')
         self.assertTrue((output / 'Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/SwiftUIMacros.dll').exists())
         original = app / 'Contents/Developer/Platforms/iPhoneOS.platform/Info.plist'
         self.assertEqual(plistlib.loads(original.read_bytes()), {'DefaultProperties': {}})

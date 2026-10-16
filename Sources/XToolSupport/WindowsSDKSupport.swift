@@ -60,6 +60,15 @@ extension SDKBuilder {
         }
     }
 
+    func installWindowsMacroRuntime(from output: URL, in bin: URL) throws {
+        // Windows searches beside the path used to start an executable. An
+        // executable symlink does not redirect the DLL search to its target.
+        for file in try FileManager.default.contentsOfDirectory(at: output, includingPropertiesForKeys: nil)
+            where file.pathExtension.lowercased() == "dll" {
+            try FileManager.default.copyWindowsTree(at: file, to: bin.appendingPathComponent(file.lastPathComponent))
+        }
+    }
+
     private func requireWindowsExecutable(_ url: URL) throws {
         let handle: FileHandle
         do {

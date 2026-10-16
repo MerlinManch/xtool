@@ -635,6 +635,9 @@ struct SDKBuilder {
                 atPath: pluginServer.path,
                 withDestinationPath: "../../../../../../OpenAppleMacrosServer\(HostPlatform.executableSuffix)"
             )
+            #if os(Windows)
+            try installWindowsMacroRuntime(from: output, in: bin)
+            #endif
 
             let hostDir = platformDir.appendingPathComponent("Developer/usr/lib/swift/host")
             let pluginsDir = hostDir.appendingPathComponent("plugins")
