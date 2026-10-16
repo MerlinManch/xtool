@@ -19,7 +19,7 @@ $source = Join-Path $work 'source.c'
 Invoke-Checked $clang @('-target', 'arm64-apple-ios17.0', '-g', '-O0', '-ffreestanding',
     '-nostdinc', '-fno-stack-protector', '-c', $source, '-o', $object)
 $library = Join-Path $work 'library.dylib'
-Invoke-Checked (Join-Path $ToolsetRoot 'bin/ld64.lld.exe') @('-arch', 'arm64', '-dylib',
+Invoke-Checked (Join-Path $ToolsetRoot 'bin/ld64.lld.exe') @('-arch', 'arm64', '-dylib', '-no_adhoc_codesign',
     '-platform_version', 'ios', '17.0', '27.0', '-install_name', '@rpath/library.dylib', '-o', $library, $object)
 Invoke-Checked (Join-Path $ToolsetRoot 'bin/dsymutil.exe') @('--flat', '-o', (Join-Path $work 'library.dwarf'), $library)
 Invoke-Checked (Join-Path $ToolsetRoot 'bin/llvm-libtool-darwin.exe') @('-static', '-o', (Join-Path $work 'library.a'), $object)
