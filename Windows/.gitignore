@@ -1,0 +1,5 @@
+/Dependencies/
+/build/
+/dist/
+/vcpkg_installed/
+/tests/__pycache__/

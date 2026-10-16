@@ -7,6 +7,9 @@
 
 #if !os(Linux)
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import ConcurrencyExtras
 import OpenAPIRuntime
 import OpenAPIURLSession
@@ -45,12 +48,16 @@ private struct Client: HTTPClientProtocol {
             _ session: URLSession,
             didReceive challenge: URLAuthenticationChallenge
         ) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+            #if canImport(Security)
             if ProcessInfo.processInfo.environment["XTL_DISABLE_TLS_VALIDATION"] == "1",
                let trust = challenge.protectionSpace.serverTrust {
                 return (.useCredential, URLCredential(trust: trust))
             } else {
                 return (.performDefaultHandling, nil)
             }
+            #else
+            return (.performDefaultHandling, nil)
+            #endif
         }
     }
 

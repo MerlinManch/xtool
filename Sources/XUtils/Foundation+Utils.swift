@@ -32,7 +32,7 @@ extension FileManager {
     ) async throws {
         // why this is needed: https://github.com/xtool-org/xtool/issues/254
 
-        #if canImport(Subprocess)
+        #if canImport(Subprocess) && !os(Windows)
         if !preserveOwner {
             let result = try await Subprocess.run(
                 .name("cp"),

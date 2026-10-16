@@ -40,7 +40,7 @@ struct DevSDKBuildCommand: AsyncParsableCommand {
 
     @Option(
         help: ArgumentHelp(
-            "The architecture of the Linux host the SDK is being built for.",
+            "The architecture of the host the SDK is being built for.",
             discussion: "Defaults to 'auto', which attempts to match the current host architecture."
         )
     ) var arch: ArchSelection = .auto

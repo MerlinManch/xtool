@@ -1,0 +1,22 @@
+diff --git a/Sources/Superutils/SharedExtensions.swift b/Sources/Superutils/SharedExtensions.swift
+index 8936a4c..ec699fd 100644
+--- a/Sources/Superutils/SharedExtensions.swift
++++ b/Sources/Superutils/SharedExtensions.swift
+@@ -37,7 +37,7 @@ public extension String {
+ 
+ }
+ 
+-#if !os(Linux) && !os(Android)
++#if canImport(Darwin)
+ public extension Progress {
+ 
+     static func performDiscretely<ReturnType>(work: () throws -> ReturnType) rethrows -> ReturnType {
+@@ -315,7 +315,7 @@ public extension Optional {
+ public extension Array where Element == String {
+ 
+     func localizedJoined() -> String {
+-        #if !os(Linux) && !os(Android)
++        #if canImport(Darwin)
+         if #available(macOS 10.15, *) {
+             return ListFormatter.localizedString(byJoining: self)
+         }

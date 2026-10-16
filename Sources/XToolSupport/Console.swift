@@ -1,10 +1,16 @@
 import Foundation
 import XKit
 import XUtils
+
+#if os(Windows)
+import WinSDK
+#else
 import NIOPosix
 import NIOCore
+#endif
 
 enum Console {
+    #if !os(Windows)
     private static func withStdio<T>(
         _ body: (
             _ stdin: NIOAsyncChannelInboundStream<ByteBuffer>,
@@ -21,7 +27,44 @@ enum Console {
             .executeThenClose { try await body($0, $1) }
     }
 
+    #endif
+
     static func prompt(_ message: String) async throws -> String {
+        #if os(Windows)
+        // NIOPipeBootstrap uses POSIX descriptors and is unavailable on Windows.
+        // Read one line without consuming the next prompt from redirected input.
+        try FileHandle.standardOutput.write(contentsOf: Data(message.utf8))
+        let console = GetStdHandle(STD_INPUT_HANDLE)
+        var mode: DWORD = 0
+        if GetConsoleMode(console, &mode) != 0 {
+            var units: [UInt16] = []
+            while true {
+                if HostPlatform.interrupted { throw CancellationError() }
+                var buffer = [UInt16](repeating: 0, count: 1024)
+                var count: DWORD = 0
+                guard ReadConsoleW(console, &buffer, 1024, &count, nil) != 0 else {
+                    if HostPlatform.interrupted { throw CancellationError() }
+                    throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()))
+                }
+                if count == 0 { break }
+                let chunk = buffer.prefix(Int(count))
+                if let newline = chunk.firstIndex(of: 10) {
+                    units.append(contentsOf: chunk[..<newline])
+                    break
+                }
+                units.append(contentsOf: chunk)
+            }
+            if units.last == 13 { units.removeLast() }
+            return String(decoding: units, as: UTF16.self)
+        }
+        var data = Data()
+        while let byte = try FileHandle.standardInput.read(upToCount: 1), !byte.isEmpty {
+            if byte[0] == 10 { break }
+            data.append(byte)
+        }
+        if data.last == 13 { data.removeLast() }
+        return String(decoding: data, as: UTF8.self)
+        #else
         try await withStdio { stdin, stdout in
             try await stdout.write(ByteBuffer(bytes: message.utf8))
 
@@ -40,6 +83,7 @@ enum Console {
             let str = String(decoding: data, as: UTF8.self)
             return str.hasSuffix("\r") ? String(str.dropLast()) : str
         }
+        #endif
     }
 
     static func promptRequired(_ message: String, existing: String?) async throws -> String {
@@ -59,25 +103,25 @@ enum Console {
         if !message.isEmpty {
             print(message, terminator: "")
         }
+        fflush(stdoutSafe)
         let password = try await withoutEcho { try await prompt("") }
         print()
         return password
     }
 
-    private static func withoutEcho<T>(_ action: () async throws -> T) async rethrows -> T {
+    private static func withoutEcho<T>(_ action: () async throws -> T) async throws -> T {
         #if os(Windows)
-        // based on https://stackoverflow.com/a/4497117/3769927
-        // TODO: Confirm that this works (or even compiles)
-
-        let hConsole = CreateFileA("CONIN$", GENERIC_WRITE | GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0)
-        var dwOldMode: DWORD = 0
-        GetConsoleMode(hConsole, &dwOldMode)
-
-        let dwNewMode = dwOldMode & ~ENABLE_ECHO_INPUT
-        SetConsoleMode(hConsole, dwNewMode)
-        defer { SetConsoleMode(hConsole, dwOldMode) }
-
-        return try action()
+        let console = GetStdHandle(STD_INPUT_HANDLE)
+        var oldMode: DWORD = 0
+        // Redirected input has no console mode; no echo is generated there.
+        let isConsole = GetConsoleMode(console, &oldMode) != 0
+        if isConsole {
+            guard SetConsoleMode(console, oldMode & ~DWORD(ENABLE_ECHO_INPUT)) != 0 else {
+                throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()))
+            }
+        }
+        defer { if isConsole { _ = SetConsoleMode(console, oldMode) } }
+        return try await action()
         #else
         var origAttr = termios()
         tcgetattr(STDIN_FILENO, &origAttr)

@@ -19,7 +19,9 @@ extension TerminationStatus {
         if isSuccess { return nil }
         switch self {
         case .exited(let code): return .exited(code)
+        #if !os(Windows)
         case .signaled(let code): return .signaled(code)
+        #endif
         }
     }
 }

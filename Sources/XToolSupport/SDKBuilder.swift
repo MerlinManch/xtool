@@ -1,6 +1,8 @@
 import Foundation
 import Dependencies
+#if !os(Windows)
 import libunxip
+#endif
 import Subprocess
 import XKit // HTTPClient, stdoutSafe
 import XUtils // System.File{Path,Descriptor}
@@ -90,9 +92,19 @@ struct SDKBuilder {
     ]
 
     static var currentSDKVersion: String {
-        """
-        epoch=\(sdkEpoch),darwinTools=\(darwinToolsVersion),oam=\(oamVersion)
-        """
+        #if os(Windows)
+        "epoch=\(sdkEpoch),darwinTools=windows-native-1,oam=\(oamVersion)"
+        #else
+        "epoch=\(sdkEpoch),darwinTools=\(darwinToolsVersion),oam=\(oamVersion)"
+        #endif
+    }
+
+    private static var hostTriplesJSON: String {
+        #if os(Windows)
+        #"["aarch64-unknown-windows-msvc", "x86_64-unknown-windows-msvc"]"#
+        #else
+        #"["aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu"]"#
+        #endif
     }
 
     // swiftlint:disable:next function_body_length
@@ -158,7 +170,7 @@ struct SDKBuilder {
                     "variants": [
                         {
                             "path": ".",
-                            "supportedTriples": ["aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu"]
+                            "supportedTriples": \(Self.hostTriplesJSON)
                         }
                     ]
                 }
@@ -175,10 +187,10 @@ struct SDKBuilder {
             "schemaVersion": "1.0",
             "rootPath": "toolset/bin",
             "linker": {
-                "path": "ld64.lld"
+                "path": "ld64.lld\(HostPlatform.executableSuffix)"
             },
             "librarian": {
-                "path": "llvm-lib"
+                "path": "llvm-lib\(HostPlatform.executableSuffix)"
             },
             "swiftCompiler": {
                 "extraCLIOptions": [
@@ -201,10 +213,10 @@ struct SDKBuilder {
             "schemaVersion": "1.0",
             "rootPath": "toolset/bin",
             "linker": {
-                "path": "ld64.lld"
+                "path": "ld64.lld\(HostPlatform.executableSuffix)"
             },
             "librarian": {
-                "path": "llvm-lib"
+                "path": "llvm-lib\(HostPlatform.executableSuffix)"
             }
         }
         """.write(
@@ -235,6 +247,9 @@ struct SDKBuilder {
 
     // swiftlint:disable:next function_body_length
     private func installToolset(in output: URL) async throws {
+        #if os(Windows)
+        try installWindowsToolset(in: output)
+        #else
         let toolsetDir = output.appendingPathComponent("toolset")
 
         try FileManager.default.createDirectory(
@@ -383,9 +398,13 @@ struct SDKBuilder {
         )
         // set -x
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: ld64.path)
+        #endif
     }
 
     private func installMacros(in output: URL) async throws {
+        #if os(Windows)
+        try installWindowsMacros(in: output)
+        #else
         @Dependency(\.httpClient) var httpClient
         let url = URL(string: """
         https://github.com/xtool-org/OpenAppleMacros/releases/download/\
@@ -423,6 +442,7 @@ struct SDKBuilder {
             }
         }
         print()
+        #endif
     }
 
     private static let expectedXcodeChildren = ["Info.plist", "version.plist", "Developer"]
@@ -595,12 +615,12 @@ struct SDKBuilder {
              */
 
             let bin = platformDir.appendingPathComponent("Developer/usr/bin")
-            let pluginServer = bin.appendingPathComponent("swift-plugin-server")
+            let pluginServer = bin.appendingPathComponent("swift-plugin-server\(HostPlatform.executableSuffix)")
             try? FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
             try? FileManager.default.removeItem(at: pluginServer)
             try FileManager.default.createSymbolicLink(
                 atPath: pluginServer.path,
-                withDestinationPath: "../../../../../../OpenAppleMacrosServer"
+                withDestinationPath: "../../../../../../OpenAppleMacrosServer\(HostPlatform.executableSuffix)"
             )
 
             let hostDir = platformDir.appendingPathComponent("Developer/usr/lib/swift/host")
@@ -623,7 +643,11 @@ struct SDKBuilder {
                 // yes we can handle said modules. the actual logic lives in the OpenAppleMacros
                 // server.
                 for library in Self.oamLibraries {
+                    #if os(Windows)
+                    let target = pluginsDir.appendingPathComponent("\(library).dll")
+                    #else
                     let target = pluginsDir.appendingPathComponent("lib\(library).so")
+                    #endif
                     try Data().write(to: target)
                 }
             }
@@ -683,7 +707,11 @@ struct SDKBuilder {
         defaultProperties["ALTERNATE_LINKER"] = "lld"
         // stub out codesign as /bin/true (SwiftBuild often emits CodeSign tasks, e.g. when
         // building for sim). we sign post-build.
+        #if os(Windows)
+        defaultProperties["CODESIGN"] = "xtool-codesign.exe"
+        #else
         defaultProperties["CODESIGN"] = "true"
+        #endif
         plist["DefaultProperties"] = defaultProperties
 
         let newData = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
@@ -694,6 +722,23 @@ struct SDKBuilder {
     // returns the number of files we actually want to keep,
     // useful for computing progress % during fs traversal
     private func _extractXIP(inputPath: String, outDir: String) async throws -> Int {
+        #if os(Windows)
+        try await Subprocess.run(
+            .path(try HostPlatform.bundledTool("xtool-unxip")),
+            arguments: [URL(fileURLWithPath: inputPath).path, outDir],
+            output: .currentStandardOutput,
+            error: .currentStandardError,
+            platformOptions: .withGracefulShutDown,
+        ).checkSuccess()
+        guard let entries = FileManager.default.enumerator(atPath: outDir) else {
+            throw Console.Error("Could not enumerate extracted Xcode archive")
+        }
+        var wanted = 0
+        for case let name as String in entries {
+            if Self.isWanted(name[...]) { wanted += 1 }
+        }
+        return wanted
+        #else
         let fd = try FileDescriptor.open(inputPath, .readOnly)
         defer { try? fd.close() }
 
@@ -756,6 +801,7 @@ struct SDKBuilder {
         print()
 
         return wanted
+        #endif
     }
 
     private static func isWanted(_ path: Substring) -> Bool {

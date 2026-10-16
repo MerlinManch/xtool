@@ -1,4 +1,7 @@
 import Foundation
+#if os(Windows)
+import CWindowsSupport
+#endif
 
 #if canImport(System)
 import System
@@ -28,19 +31,29 @@ extension FilePath {
 #endif
 
 extension FileDescriptor {
-    enum LockMode {
+    package enum LockMode: Equatable {
         case shared
         case exclusive
 
+        #if !os(Windows)
         fileprivate var raw: CInt {
             switch self {
             case .shared: LOCK_SH
             case .exclusive: LOCK_EX
             }
         }
+        #endif
     }
 
-    func tryLock(mode: LockMode) throws -> Bool {
+    package func tryLock(mode: LockMode) throws -> Bool {
+        #if os(Windows)
+        var error: UInt32 = 0
+        let result = xtool_try_lock(rawValue, mode == .exclusive ? 1 : 0, &error)
+        guard result >= 0 else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(error))
+        }
+        return result == 1
+        #else
         if flock(rawValue, mode.raw | LOCK_NB) == 0 {
             return true
         }
@@ -49,5 +62,6 @@ extension FileDescriptor {
             return false
         }
         throw Errno(rawValue: err)
+        #endif
     }
 }

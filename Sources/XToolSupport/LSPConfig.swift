@@ -1,7 +1,16 @@
 import Foundation
 import PackLib
+import XUtils
 
 enum LSPConfig {
+    private static var bspArguments: String {
+        #if os(Windows)
+        #"["xtool.exe", "dev", "build-server"]"#
+        #else
+        #"["/usr/bin/env", "xtool", "dev", "build-server"]"#
+        #endif
+    }
+
     static let bsp: (String, String) = (
         ".bsp/xtool.json",
         """
@@ -10,7 +19,7 @@ enum LSPConfig {
             "version": "1.0",
             "bspVersion": "2.2.0",
             "languages": ["c", "cpp", "objective-c", "objective-cpp", "swift"],
-            "argv": ["/usr/bin/env", "xtool", "dev", "build-server"]
+            "argv": \(bspArguments)
         }
         """
     )

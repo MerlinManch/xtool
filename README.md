@@ -12,6 +12,13 @@ xtool is a cross-platform (Linux/WSL/macOS) tool that replicates Xcode functiona
 
 ✅ Interact with Apple Developer Services programmatically
 
+## Native Windows development
+
+An experimental native Windows implementation and build scripts are available in
+[Windows/README.md](Windows/README.md). Full Windows CLI/device validation and the
+native device-library distribution are still required; this is not a verified
+complete Windows release.
+
 ## Getting Started
 
 1. Follow the guide to install `xtool`

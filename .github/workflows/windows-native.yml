@@ -1,0 +1,39 @@
+name: Native Windows helpers
+on:
+  push:
+    paths: ['Windows/**', 'Sources/CWindowsSupport/**', '.github/workflows/windows-native.yml']
+  pull_request:
+    paths: ['Windows/**', 'Sources/CWindowsSupport/**', '.github/workflows/windows-native.yml']
+  workflow_dispatch:
+jobs:
+  helpers:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native helpers
+        shell: pwsh
+        run: ./Windows/build.ps1 -HelpersOnly -VcpkgRoot "$env:VCPKG_INSTALLATION_ROOT"
+      - name: Test XIP extraction
+        shell: pwsh
+        run: |
+          $env:XTOOL_NATIVE_BIN = "$pwd/Windows/dist/bin"
+          $env:XTOOL_NATIVE_TEST_CHILD = "$pwd/Windows/build/Release/xtool-test-child.exe"
+          python -m unittest discover -s Windows/tests -v
+      - name: Test Win32 primitives
+        shell: pwsh
+        run: |
+          ./Windows/build/Release/xtool-test-support.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Win32 support tests failed' }
+      - name: Compile Win32 primitives
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -property installationPath
+          Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          cl /nologo /W4 /WX /c /ISources/CWindowsSupport/include Sources/CWindowsSupport/WindowsSupport.c /FoWindows/build/WindowsSupport.obj
+          if ($LASTEXITCODE -ne 0) { throw 'Win32 support compilation failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xtool-windows-native-helpers-x64
+          path: Windows/dist/bin/

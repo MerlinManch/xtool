@@ -2,9 +2,22 @@ import Foundation
 import XKit
 import ArgumentParser
 import XUtils
+#if os(Windows)
+import WinSDK
+#endif
 
 public enum XTool {
     public static func run(arguments: [String]? = nil) async throws {
+        #if os(Windows)
+        let inputCodePage = GetConsoleCP()
+        let outputCodePage = GetConsoleOutputCP()
+        _ = SetConsoleCP(UINT(CP_UTF8))
+        _ = SetConsoleOutputCP(UINT(CP_UTF8))
+        defer {
+            if inputCodePage != 0 { _ = SetConsoleCP(inputCodePage) }
+            if outputCodePage != 0 { _ = SetConsoleOutputCP(outputCodePage) }
+        }
+        #endif
         TemporaryDirectory.prepare()
         await XToolCommand.cancellableMain(arguments)
     }
@@ -74,10 +87,35 @@ extension ParsableCommand where Self: SendableMetatype {
             }
         }
 
+        #if os(Windows)
+        do {
+            try HostPlatform.installInterruptHandler()
+        } catch {
+            task.cancel()
+            cont.finish()
+            await task.value
+            self.exit(withError: error)
+        }
+        defer { HostPlatform.removeInterruptHandler() }
+        let interruptMonitor = Task {
+            while !Task.isCancelled {
+                if HostPlatform.interrupted {
+                    task.cancel()
+                    return
+                }
+                do {
+                    try await Task.sleep(for: .milliseconds(50))
+                } catch { return }
+            }
+        }
+        defer { interruptMonitor.cancel() }
+        #else
         signal(SIGINT, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: SIGINT)
         source.setEventHandler { task.cancel() }
         source.resume()
+        defer { source.cancel() }
+        #endif
 
         cont.finish()
 

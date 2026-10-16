@@ -1,0 +1,183 @@
+diff --git a/Package.swift b/Package.swift
+index a1d8fbf..f112572 100644
+--- a/Package.swift
++++ b/Package.swift
+@@ -2,6 +2,12 @@
+ 
+ import PackageDescription
+ 
++#if os(Windows)
++let windowsSources = ["build/windows/vs2022/zsign/src/iconv.cpp"]
++#else
++let windowsSources: [String] = []
++#endif
++
+ let package = Package(
+     name: "zsign",
+     platforms: [
+@@ -24,24 +30,32 @@ let package = Package(
+                 .product(name: "OpenSSL", package: "xtool-core"),
+                 .product(name: "SignerSupport", package: "xtool-core")
+             ],
+-            path: "src",
++            path: ".",
+             sources: [
+-                "lib/Zupersign.cpp",
+-                "archo.cpp",
+-                "bundle.cpp",
+-                "macho.cpp",
+-                "openssl.cpp",
+-                "signing.cpp",
+-                "common/fs.cpp",
+-                "common/json.cpp",
+-                "common/log.cpp",
+-                "common/sha.cpp",
+-                "common/timer.cpp",
+-                "common/util.cpp",
+-            ],
++                "src/lib/Zupersign.cpp",
++                "src/archo.cpp",
++                "src/bundle.cpp",
++                "src/macho.cpp",
++                "src/openssl.cpp",
++                "src/signing.cpp",
++                "src/common/fs.cpp",
++                "src/common/json.cpp",
++                "src/common/log.cpp",
++                "src/common/sha.cpp",
++                "src/common/timer.cpp",
++                "src/common/util.cpp",
++            ] + windowsSources,
++            publicHeadersPath: "src/include",
+             cSettings: [
+-                .headerSearchPath("common"),
+-                .headerSearchPath("."),
++                .headerSearchPath("src/common"),
++                .headerSearchPath("build/windows/vs2022/zsign/src", .when(platforms: [.windows])),
++                .headerSearchPath("src"),
++            ],
++            linkerSettings: [
++                .linkedLibrary("shell32", .when(platforms: [.windows])),
++                .linkedLibrary("shlwapi", .when(platforms: [.windows])),
++                .linkedLibrary("ws2_32", .when(platforms: [.windows])),
++                .linkedLibrary("crypt32", .when(platforms: [.windows])),
+             ]
+         ),
+     ],
+diff --git a/build/windows/vs2022/zsign/src/common_win32.h b/build/windows/vs2022/zsign/src/common_win32.h
+index ea9a15b..ed25127 100644
+--- a/build/windows/vs2022/zsign/src/common_win32.h
++++ b/build/windows/vs2022/zsign/src/common_win32.h
+@@ -1,42 +1,28 @@
+-#pragma once
+-
+-#ifndef WINVER
+-#define WINVER 0x0501
+-#endif
+-
+-#ifndef _WIN32_WINNT
+-#define _WIN32_WINNT 0x0501
+-#endif						
+-
+-#ifndef _WIN32_WINDOWS
+-#define _WIN32_WINDOWS 0x0410
+-#endif
+-
+-#define WIN32_LEAN_AND_MEAN
+-
+-#include <windows.h>
+-#include <shlobj.h>
+-#include <Shlwapi.h>
+-#include <shellapi.h>
+-#include <direct.h>
+-#include "iconv.h"
+-#include "getopt.h"
+-
+-#define PATH_MAX					4096
+-#define strerror(x)					#x
+-#define _fopen64(fp, path, mode)	{ fopen_s(&fp, path, mode); }
+-
+-#ifdef _M_ARM64
+-#pragma comment(lib, "../lib/openssl/arm64/mt/libssl.lib")
+-#pragma comment(lib, "../lib/openssl/arm64/mt/libcrypto.lib")
+-#elif _M_X64
+-#pragma comment(lib, "../lib/openssl/x64/mt/libssl.lib")
+-#pragma comment(lib, "../lib/openssl/x64/mt/libcrypto.lib")
+-#else
+-#pragma comment(lib, "../lib/openssl/x86/mt/libssl.lib")
+-#pragma comment(lib, "../lib/openssl/x86/mt/libcrypto.lib")
+-#endif
+-
+-#pragma comment(lib, "shlwapi.lib")
+-#pragma comment(lib, "Ws2_32.lib")
+-#pragma comment(lib, "crypt32.lib")
+\ No newline at end of file
++#pragma once
++
++#ifndef WINVER
++#define WINVER 0x0501
++#endif
++
++#ifndef _WIN32_WINNT
++#define _WIN32_WINNT 0x0501
++#endif
++
++#ifndef _WIN32_WINDOWS
++#define _WIN32_WINDOWS 0x0410
++#endif
++
++#define WIN32_LEAN_AND_MEAN
++#define NOMINMAX
++
++#include <windows.h>
++#include <shlobj.h>
++#include <Shlwapi.h>
++#include <shellapi.h>
++#include <direct.h>
++#include "iconv.h"
++
++
++#define PATH_MAX					4096
++
++#define _fopen64(fp, path, mode)	{ fopen_s(&fp, path, mode); }
+diff --git a/src/common/fs.cpp b/src/common/fs.cpp
+index 35d226f..2b5b2c8 100644
+--- a/src/common/fs.cpp
++++ b/src/common/fs.cpp
+@@ -481,7 +481,7 @@ bool ZFile::EnumFolder(const char* szFolder, bool bRecursive, enum_folder_callba
+ 		return false;
+ 	}
+ 
+-	while (::FindNextFileA(hFind, &fd)) {
++	do {
+ 		if (0 == strcmp(fd.cFileName, ".") || 0 == strcmp(fd.cFileName, "..")) {
+ 			continue;
+ 		}
+@@ -504,6 +504,7 @@ bool ZFile::EnumFolder(const char* szFolder, bool bRecursive, enum_folder_callba
+ 			EnumFolder(strPath.c_str(), bRecursive, filter, callback);
+ 		}
+ 	}
++	while (::FindNextFileA(hFind, &fd));
+ 	::FindClose(hFind);
+ 
+ #else
+diff --git a/src/lib/Zupersign.cpp b/src/lib/Zupersign.cpp
+index 7b941e1..5cfe5c5 100644
+--- a/src/lib/Zupersign.cpp
++++ b/src/lib/Zupersign.cpp
+@@ -11,12 +11,14 @@ static void print_ssl_err(char **exception, const char *reason) {
+         *exception = strdup(reason);
+         return;
+     }
+-    asprintf(exception,
++    char message[1024];
++    snprintf(message, sizeof(message),
+              "%s (error:%lx:%s:%s)",
+              reason,
+              last_error,
+              ERR_lib_error_string(last_error),
+              ERR_reason_error_string(last_error));
++    *exception = strdup(message);
+ }
+ 
+ int zsign_sign(

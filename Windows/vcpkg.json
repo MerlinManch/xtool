@@ -1,0 +1,8 @@
+{
+  "name": "xtool-windows-helpers",
+  "version-string": "1.0.0",
+  "dependencies": [
+    { "name": "libarchive", "default-features": false, "features": ["lzma", "xar", "crypto"] },
+    "liblzma"
+  ]
+}

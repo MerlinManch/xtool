@@ -66,7 +66,10 @@ public struct BuildSettings: Sendable {
             self.sdkEnvironment.merge([
                 "XCODE_EXTRA_PLATFORM_FOLDERS": "\(darwinSDK.bundle.path)/Developer/Platforms",
                 // SWB looks for dsymutil in the PATH. Other stuff (lld, libtool) is handled by toolset-swb.json.
-                "PATH": "\(darwinSDK.bundle.path)/toolset/bin:\(ProcessInfo.processInfo.environment["PATH"] ?? "")",
+                "PATH": HostPlatform.prependingSearchPath(
+                    darwinSDK.bundle.appending(path: "toolset/bin").path,
+                    to: ProcessInfo.processInfo.environment["PATH"] ?? ""
+                ),
             ]) { $1 }
             #endif
         }
@@ -120,7 +123,7 @@ public struct BuildSettings: Sendable {
         let executable: Executable
         let baseArguments: [String]
         if let customBinDir = Self.customBinDir {
-            executable = .path(customBinDir.appending("swift-\(tool)"))
+            executable = .path(customBinDir.appending("swift-\(tool)\(HostPlatform.executableSuffix)"))
             baseArguments = []
         } else {
             #if os(macOS)

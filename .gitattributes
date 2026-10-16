@@ -1,0 +1,2 @@
+# Patch payloads contain upstream context and original mixed line endings.
+Windows/patches/*.patch -text -whitespace

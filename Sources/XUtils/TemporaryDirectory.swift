@@ -126,6 +126,7 @@ private struct TemporaryDirectoryRoot {
                 permissions: [.ownerReadWrite, .groupRead, .otherRead],
             )
             guard try fd.tryLock(mode: .exclusive) else {
+                try? fd.close()
                 // someone else raced us and claimed the right to prune between when we created the file and
                 // when we tried to lock it
                 continue
@@ -150,7 +151,8 @@ private struct TemporaryDirectoryRoot {
                 }
                 guard basename.hasPrefix("pid-") && basename.hasSuffix(".lock") else { continue }
                 let lockFD = try FileDescriptor.open(FilePath(lock.path), .readWrite)
-                defer { try? lockFD.close() }
+                var lockIsOpen = true
+                defer { if lockIsOpen { try? lockFD.close() } }
                 if try lockFD.tryLock(mode: .exclusive) {
                     // we must remove the directory first. if we instead removed the lock first,
                     // we could be killed after the lock was removed but before the dir was
@@ -160,6 +162,11 @@ private struct TemporaryDirectoryRoot {
                     } catch CocoaError.fileNoSuchFile {
                         // pass
                     }
+                    // Windows cannot unlink an open CRT file. Release our orphan lock first.
+                    #if os(Windows)
+                    try lockFD.close()
+                    lockIsOpen = false
+                    #endif
                     try FileManager.default.removeItem(at: lock)
                 }
             } catch {

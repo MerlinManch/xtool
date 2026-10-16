@@ -27,6 +27,19 @@ let swiftSettings: [SwiftSetting] = {
     return settings
 }()
 
+#if os(Windows)
+// Prepared from pinned upstream revisions by Windows/build.ps1.
+let nativePackages: [Package.Dependency] = [
+    .package(path: "Windows/Dependencies/xtool-core"),
+    .package(path: "Windows/Dependencies/zsign"),
+]
+#else
+let nativePackages: [Package.Dependency] = [
+    .package(url: "https://github.com/xtool-org/xtool-core", .upToNextMinor(from: "1.5.0")),
+    .package(url: "https://github.com/xtool-org/zsign", .upToNextMinor(from: "1.9.0")),
+]
+#endif
+
 let package = Package(
     name: "xtool",
     platforms: [
@@ -47,10 +60,8 @@ let package = Package(
             targets: ["xtool"]
         ),
     ],
-    dependencies: [
-        .package(url: "https://github.com/xtool-org/xtool-core", .upToNextMinor(from: "1.5.0")),
+    dependencies: nativePackages + [
         .package(url: "https://github.com/xtool-org/SwiftyMobileDevice", .upToNextMinor(from: "1.7.0")),
-        .package(url: "https://github.com/xtool-org/zsign", .upToNextMinor(from: "1.9.0")),
         .package(url: "https://github.com/xtool-org/xadi", .upToNextMinor(from: "0.4.2")),
 
         .package(url: "https://github.com/apple/swift-system", from: "1.4.0"),
@@ -88,6 +99,7 @@ let package = Package(
         .package(url: "https://github.com/tuist/XcodeProj.git", from: "9.17.5"),
     ],
     targets: [
+        .target(name: "CWindowsSupport"),
         .target(
             name: "CXKit",
             dependencies: [
@@ -111,11 +123,12 @@ let package = Package(
         .target(
             name: "XUtils",
             dependencies: [
+                .target(name: "CWindowsSupport", condition: .when(platforms: [.windows])),
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(
                     name: "Subprocess",
                     package: "swift-subprocess",
-                    condition: .when(platforms: [.linux, .macOS])
+                    condition: .when(platforms: [.linux, .macOS, .windows])
                 ),
             ],
             swiftSettings: swiftSettings,
@@ -163,6 +176,7 @@ let package = Package(
         .testTarget(
             name: "XToolTests",
             dependencies: [
+                "XUtils",
                 "XKit",
                 "XToolSupport",
                 "PackLib",
@@ -179,8 +193,8 @@ let package = Package(
                 "PackLib",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "libunxip", package: "unxip"),
+                .product(name: "NIOPosix", package: "swift-nio", condition: .when(platforms: [.linux, .macOS])),
+                .product(name: "libunxip", package: "unxip", condition: .when(platforms: [.linux, .macOS])),
             ],
             cSettings: cSettings,
             swiftSettings: swiftSettings,
