@@ -1,0 +1,35 @@
+diff --git a/Package.swift b/Package.swift
+index ef103c9..44d11fd 100644
+--- a/Package.swift
++++ b/Package.swift
+@@ -11,6 +11,12 @@
+ import Foundation
+ import PackageDescription
+ 
++#if os(Windows)
++let pluginExclusions = ["Symbolic Links"]
++#else
++let pluginExclusions = ["Symbolic Links/README.md"]
++#endif
++
+ let package = Package(
+     name: "SwiftDocCPlugin",
+     platforms: [
+@@ -33,7 +39,7 @@ let package = Package(
+                 "snippet-extract",
+             ],
+             path: "Plugins/Swift-DocC Convert",
+-            exclude: ["Symbolic Links/README.md"]
++            exclude: pluginExclusions
+         ),
+         
+         .plugin(
+@@ -47,7 +53,7 @@ let package = Package(
+             dependencies: [
+                 "snippet-extract",
+             ],
+-            exclude: ["Symbolic Links/README.md"]
++            exclude: pluginExclusions
+         ),
+         
+         .target(name: "SwiftDocCPluginUtilities"),

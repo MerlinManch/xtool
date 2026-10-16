@@ -36,6 +36,7 @@ let nativePackages: [Package.Dependency] = [
     .package(path: "Windows/Dependencies/XcodeProj"),
     .package(path: "Windows/Dependencies/swift-issue-reporting"),
     .package(path: "Windows/Dependencies/combine-schedulers"),
+    .package(path: "Windows/Dependencies/swift-docc-plugin"),
 ]
 #else
 let nativePackages: [Package.Dependency] = [
@@ -45,6 +46,7 @@ let nativePackages: [Package.Dependency] = [
     .package(url: "https://github.com/saagarjha/unxip", from: "3.2.0"),
     .package(url: "https://github.com/kylef/PathKit", from: "1.0.1"),
     .package(url: "https://github.com/tuist/XcodeProj.git", from: "9.17.5"),
+    .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0"),
 ]
 #endif
 
@@ -97,7 +99,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-collections", exact: "1.6.0"),
         .package(url: "https://github.com/apple/xcode-project-format.git", .upToNextMinor(from: "0.1.0")),
 
-        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0"),
         .package(url: "https://github.com/swiftlang/swift-subprocess", from: "1.0.0"),
 
         .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.23.0"),

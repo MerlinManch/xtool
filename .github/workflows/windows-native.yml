@@ -1,9 +1,9 @@
 name: Native Windows port
 on:
   push:
-    paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/cli-tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Windows/patches/XcodeProj.patch', 'Windows/patches/swift-issue-reporting.patch', 'Windows/patches/combine-schedulers.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
+    paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/cli-tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Windows/patches/XcodeProj.patch', 'Windows/patches/swift-issue-reporting.patch', 'Windows/patches/combine-schedulers.patch', 'Windows/patches/swift-docc-plugin.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
   pull_request:
-    paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/cli-tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Windows/patches/XcodeProj.patch', 'Windows/patches/swift-issue-reporting.patch', 'Windows/patches/combine-schedulers.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
+    paths: ['Windows/build.ps1', 'Windows/native/**', 'Windows/tests/**', 'Windows/cli-tests/**', 'Windows/vcpkg.json', 'Windows/patches/xtool-core.patch', 'Windows/patches/zsign.patch', 'Windows/patches/PathKit.patch', 'Windows/patches/XcodeProj.patch', 'Windows/patches/swift-issue-reporting.patch', 'Windows/patches/combine-schedulers.patch', 'Windows/patches/swift-docc-plugin.patch', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/windows-native.yml']
   workflow_dispatch:
 concurrency:
   group: windows-native-${{ github.ref }}
