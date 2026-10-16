@@ -14,3 +14,4 @@
 /delivery/
 /component-builds.json
 /runtime-test/
+/macro-tests/__pycache__/

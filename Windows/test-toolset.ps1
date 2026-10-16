@@ -45,3 +45,5 @@ foreach ($name in @('library.dylib', 'library.dwarf')) {
     }
 }
 Write-Host 'Native Windows Darwin compilation, linking, archiving and debug-symbol generation passed'
+$env:XTOOL_NATIVE_MACRO_SERVER = Join-Path (Split-Path $ToolsetRoot -Parent) 'windows-macros/OpenAppleMacrosServer.exe'
+Invoke-Checked python @('-m', 'unittest', 'discover', '-s', (Join-Path $PSScriptRoot 'macro-tests'), '-v')

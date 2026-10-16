@@ -26,5 +26,6 @@ if (-not $SkipTests) {
     }
     & (Join-Path $PSScriptRoot 'build/Release/xtool-test-support.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Win32 support tests failed' }
+    & (Join-Path $PSScriptRoot 'test-toolset.ps1')
 }
 & (Join-Path $PSScriptRoot 'package.ps1')

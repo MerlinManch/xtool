@@ -1,7 +1,7 @@
 name: Native Windows Darwin integration
 on:
   push:
-    paths: ['Windows/test-toolset.ps1', '.github/workflows/windows-toolset-test.yml']
+    paths: ['Windows/test-toolset.ps1', 'Windows/macro-tests/**', '.github/workflows/windows-toolset-test.yml']
   workflow_dispatch:
     inputs:
       toolset_run:
