@@ -1,7 +1,7 @@
 name: Native Windows file operations
 on:
   push:
-    paths: ['Sources/XUtils/WindowsFileOperations.swift', 'Windows/tests/FileOperationsSmoke.swift', 'Windows/test-file-operations.ps1', '.github/workflows/windows-file-operations.yml']
+    paths: ['Sources/XUtils/WindowsFileOperations.swift', 'Windows/tests/FileOperationsSmoke.swift', 'Windows/file-operation-tests/**', 'Windows/test-file-operations.ps1', '.github/workflows/windows-file-operations.yml']
   workflow_dispatch:
 permissions:
   contents: read
