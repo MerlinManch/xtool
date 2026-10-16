@@ -100,6 +100,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "CWindowsSupport"),
+        .target(name: "CWindowsADI"),
         .target(
             name: "CXKit",
             dependencies: [
@@ -136,6 +137,7 @@ let package = Package(
         .target(
             name: "XKit",
             dependencies: [
+                .target(name: "CWindowsADI", condition: .when(platforms: [.windows])),
                 "DeveloperAPI",
                 "CXKit",
                 "XUtils",

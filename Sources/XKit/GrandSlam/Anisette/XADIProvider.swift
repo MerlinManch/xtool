@@ -1,7 +1,12 @@
-#if canImport(XADI)
+#if canImport(XADI) || os(Windows)
 
 import Foundation
+#if os(Windows)
+import CWindowsADI
+import XUtils
+#else
 import XADI
+#endif
 import Dependencies
 import Subprocess
 
@@ -46,6 +51,13 @@ public actor XADIProvider: RawADIProvider {
             let archDir = "lib/\(arch)"
 
             // TODO: Use ZIPFoundation
+            #if os(Windows)
+            try await Subprocess.run(
+                .path(try HostPlatform.bundledTool("xtool-zip")),
+                arguments: ["extract", applemusic.path, tmp.path],
+                output: .discarded
+            ).checkSuccess()
+            #else
             try await Subprocess.run(
                 .name("unzip"),
                 arguments: [
@@ -57,6 +69,7 @@ public actor XADIProvider: RawADIProvider {
                 ],
                 output: .discarded
             ).checkSuccess()
+            #endif
             try FileManager.default.moveItem(
                 at: tmp.appending(path: archDir),
                 to: libDir
@@ -64,7 +77,11 @@ public actor XADIProvider: RawADIProvider {
             try? FileManager.default.removeItem(at: tmp)
         }
 
+        #if os(Windows)
+        try check(xadi_LoadChecked(libDir.path))
+        #else
         xadi_Load(strdup(libDir.path()))
+        #endif
 
         let rawID = id.uuidString.replacingOccurrences(of: "-", with: "").prefix(16).lowercased()
         try check(xadi_SetAndroidID(rawID, UInt32(rawID.utf8.count)))
@@ -134,11 +151,13 @@ public actor XADIProvider: RawADIProvider {
             // which is a... strange choice that prevents us from reading
             // or writing by default. Since we're the owner, we can easily
             // change this though.
+            #if !os(Windows)
             try FileManager.default.setAttributes(
                 // rw for owner
                 [.posixPermissions: 0o600],
                 ofItemAtPath: file.path
             )
+            #endif
             return try Data(contentsOf: file)
         }
     }

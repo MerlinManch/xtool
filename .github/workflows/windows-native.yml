@@ -8,12 +8,27 @@ on:
 jobs:
   helpers:
     runs-on: windows-2022
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/Windows/binary-cache
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare binary cache
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+      - uses: actions/cache@v4
+        with:
+          path: Windows/binary-cache
+          key: windows-msvc-vcpkg-${{ hashFiles('Windows/vcpkg.json') }}
       - uses: compnerd/gha-setup-swift@86d1ddeaf915c282137601aeb0654ea0e7b7f17e
         with:
           swift-version: swift-6.4.1-release
           swift-build: 6.4.1-RELEASE
+      - uses: dlang-community/setup-dlang@a6f7969b8b5dc3ff448c30f2c6749150795814f3
+        with:
+          compiler: ldc-1.43.0
+      - name: Build native Anisette runtime
+        shell: pwsh
+        run: ./Windows/build-anisette.ps1
       - name: Build native helpers
         shell: pwsh
         run: ./Windows/build.ps1 -HelpersOnly -VcpkgRoot "$env:VCPKG_INSTALLATION_ROOT"

@@ -41,6 +41,13 @@ function Initialize-Dependency([string]$Name, [string]$Revision) {
 if (-not $VcpkgRoot) { throw 'Pass -VcpkgRoot or set VCPKG_ROOT.' }
 $toolchain = Join-Path $VcpkgRoot 'scripts/buildsystems/vcpkg.cmake'
 if (-not (Test-Path $toolchain)) { throw "Missing vcpkg CMake toolchain: $toolchain" }
+# Hosted runners may have a shallow vcpkg checkout older than our baseline.
+$manifest = Get-Content (Join-Path $PSScriptRoot 'vcpkg.json') -Raw | ConvertFrom-Json
+$baseline = $manifest.'builtin-baseline'
+& git -C $VcpkgRoot cat-file -e "${baseline}:versions/baseline.json" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Invoke-Checked git @('-C', $VcpkgRoot, 'fetch', '--depth=1', 'origin', $baseline)
+}
 $cmakeConfiguration = if ($Configuration -eq 'release') { 'Release' } else { 'Debug' }
 $triplet = "$Architecture-windows"
 New-Item -ItemType Directory -Force $build, $dist | Out-Null

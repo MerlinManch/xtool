@@ -1,0 +1,90 @@
+diff --git a/dub.sdl b/dub.sdl
+index ce7321d..f0fb369 100644
+--- a/dub.sdl
++++ b/dub.sdl
+@@ -7,3 +7,9 @@ dependency "provision" repository="git+https://github.com/xtool-org/Provision.gi
+ 
+ # libplist-d brings in symbols like plist_from_bin which shadow the copy of libplist that xtool uses
+ subConfiguration "provision" "plist-d"
++
++configuration "windows" {
++    targetType "dynamicLibrary"
++    targetName "XADIBinary"
++    dflags "--link-defaultlib-shared=false" platform="windows-ldc"
++}
+diff --git a/src/exports.d b/src/exports.d
+index 938ffc9..075c29e 100644
+--- a/src/exports.d
++++ b/src/exports.d
+@@ -9,7 +9,7 @@ import slf4d.default_provider;
+ 
+ __gshared ADI gADI;
+ 
+-public extern(C) void xadi_Load(const char* path) {
++public export extern(C) void xadi_Load(const char* path) {
+     Runtime.initialize();
+     debug {
+         configureLoggingProvider(new shared DefaultProvider(true, Levels.DEBUG));
+@@ -17,42 +17,52 @@ public extern(C) void xadi_Load(const char* path) {
+     gADI = new ADI(cast(string) path.fromStringz);
+ }
+ 
+-public extern(C) int xadi_SetAndroidID(const char* identifier, uint length) {
++public export extern(C) int xadi_SetAndroidID(const char* identifier, uint length) {
+     return androidInvoke!gADI.pADISetAndroidID(identifier, length);
+ }
+ 
+-public extern(C) int xadi_SetProvisioningPath(const char* path) {
++public export extern(C) int xadi_SetProvisioningPath(const char* path) {
+     return androidInvoke!gADI.pADISetProvisioningPath(path);
+ }
+ 
+-public extern(C) int xadi_ProvisioningErase(ulong dsId) {
++public export extern(C) int xadi_ProvisioningErase(ulong dsId) {
+     return androidInvoke!gADI.pADIProvisioningErase(dsId);
+ }
+ 
+-public extern(C) int xadi_Synchronize(ulong dsId, ubyte* serverIntermediateMetadata, uint serverIntermediateMetadataLength, ubyte** machineIdentifier, uint* machineIdentifierLength, ubyte** synchronizationResumeMetadata, uint* synchronizationResumeMetadataLength) {
++public export extern(C) int xadi_Synchronize(ulong dsId, ubyte* serverIntermediateMetadata, uint serverIntermediateMetadataLength, ubyte** machineIdentifier, uint* machineIdentifierLength, ubyte** synchronizationResumeMetadata, uint* synchronizationResumeMetadataLength) {
+     return androidInvoke!gADI.pADISynchronize(dsId, serverIntermediateMetadata, serverIntermediateMetadataLength, machineIdentifier, machineIdentifierLength, synchronizationResumeMetadata, synchronizationResumeMetadataLength);
+ }
+ 
+-public extern(C) int xadi_ProvisioningDestroy(uint session) {
++public export extern(C) int xadi_ProvisioningDestroy(uint session) {
+     return androidInvoke!gADI.pADIProvisioningDestroy(session);
+ }
+ 
+-public extern(C) int xadi_ProvisioningEnd(uint session, ubyte* persistentTokenMetadata, uint persistentTokenMetadataLength, ubyte* trustKey, uint trustKeyLength) {
++public export extern(C) int xadi_ProvisioningEnd(uint session, ubyte* persistentTokenMetadata, uint persistentTokenMetadataLength, ubyte* trustKey, uint trustKeyLength) {
+     return androidInvoke!gADI.pADIProvisioningEnd(session, persistentTokenMetadata, persistentTokenMetadataLength, trustKey, trustKeyLength);
+ }
+ 
+-public extern(C) int xadi_ProvisioningStart(ulong dsId, ubyte* serverProvisioningIntermediateMetadata, uint serverProvisioningIntermediateMetadataLength, ubyte** clientProvisioningIntermediateMetadata, uint* clientProvisioningIntermediateMetadataLength, uint* session) {
++public export extern(C) int xadi_ProvisioningStart(ulong dsId, ubyte* serverProvisioningIntermediateMetadata, uint serverProvisioningIntermediateMetadataLength, ubyte** clientProvisioningIntermediateMetadata, uint* clientProvisioningIntermediateMetadataLength, uint* session) {
+     return androidInvoke!gADI.pADIProvisioningStart(dsId, serverProvisioningIntermediateMetadata, serverProvisioningIntermediateMetadataLength, clientProvisioningIntermediateMetadata, clientProvisioningIntermediateMetadataLength, session);
+ }
+ 
+-public extern(C) int xadi_GetLoginCode(ulong dsId) {
++public export extern(C) int xadi_GetLoginCode(ulong dsId) {
+     return androidInvoke!gADI.pADIGetLoginCode(dsId);
+ }
+ 
+-public extern(C) int xadi_Dispose(void* ptr) {
++public export extern(C) int xadi_Dispose(void* ptr) {
+     return androidInvoke!gADI.pADIDispose(ptr);
+ }
+ 
+-public extern(C) int xadi_OTPRequest(ulong dsId, ubyte** machineIdentifier, uint* machineIdentifierLength, ubyte** oneTimePassword, uint* oneTimePasswordLength) {
++public export extern(C) int xadi_OTPRequest(ulong dsId, ubyte** machineIdentifier, uint* machineIdentifierLength, ubyte** oneTimePassword, uint* oneTimePasswordLength) {
+     return androidInvoke!gADI.pADIOTPRequest(dsId, machineIdentifier, machineIdentifierLength, oneTimePassword, oneTimePasswordLength);
+ }
++
++// Keep D exceptions inside the DLL ABI; the Swift caller can report load failure.
++public export extern(C) int xadi_LoadChecked(const char* path) {
++    try {
++        xadi_Load(path);
++        return 0;
++    } catch (Throwable error) {
++        return -1000001;
++    }
++}

@@ -3,3 +3,5 @@
 /dist/
 /vcpkg_installed/
 /tests/__pycache__/
+
+/binary-cache/

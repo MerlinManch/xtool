@@ -49,7 +49,7 @@ private struct UnimplementedRawADIProvider: RawADIProvider {
 private enum RawADIProviderDependencyKey: DependencyKey {
     static let testValue: RawADIProvider = UnimplementedRawADIProvider()
     static let liveValue: RawADIProvider = {
-        #if canImport(XADI)
+        #if canImport(XADI) || os(Windows)
         return XADIProvider()
         #else
         return OmnisetteADIProvider()
@@ -294,6 +294,10 @@ public struct ADIError: Error, CustomStringConvertible {
 
     public var description: String {
         switch code {
+        case -1000002:
+            return "The local Anisette runtime could not be loaded. Install XADIBinary.dll and its dependencies beside xtool.exe."
+        case -1000001:
+            return "The local Anisette runtime could not initialize the downloaded Apple libraries."
         case -45061:
             return """
             You were logged out. Please log in again with `xtool auth`.
