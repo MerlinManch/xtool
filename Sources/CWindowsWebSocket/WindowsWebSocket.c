@@ -136,7 +136,7 @@ struct xtool_websocket {
     SRWLOCK handles_lock, read_lock, write_lock;
     HINTERNET session, connection, request, socket;
     HANDLE open_done, read_done, write_done, shutdown_done;
-    volatile LONG references, closed, attempted;
+    volatile LONG references, closed, attempted, tls_active;
     xtool_http_client *client;
     int secure;
     volatile LONG open_error, read_error, write_error, shutdown_error;
@@ -180,14 +180,20 @@ static void CALLBACK callback(HINTERNET handle, DWORD_PTR raw_context, DWORD sta
         return;
     }
     if (!context->socket) {
-        if (status == WINHTTP_CALLBACK_STATUS_SENDING_REQUEST && state->client &&
-            !verify_server(state->client, handle)) {
-            // Informational callbacks may close their own request. Validate
-            // before any HTTP headers or body are sent, including redirects.
-            InterlockedExchange(&state->closed, 1);
-            HINTERNET request = (HINTERNET)InterlockedExchangePointer((PVOID volatile *)&state->request, NULL);
-            if (request) WinHttpCloseHandle(request);
-            return;
+        if (status == WINHTTP_CALLBACK_STATUS_SENDING_REQUEST && state->client) {
+            // Cancellation marks the request closed immediately, but defers
+            // physical closure while this callback queries its certificate.
+            InterlockedIncrement(&state->tls_active);
+            BOOL valid = !atomic_read(&state->closed) && verify_server(state->client, handle);
+            if (!valid) InterlockedExchange(&state->closed, 1);
+            InterlockedDecrement(&state->tls_active);
+            if (atomic_read(&state->closed)) {
+                // Informational callbacks may close their own request. Reject
+                // before any HTTP headers or body are sent, also on redirects.
+                HINTERNET request = (HINTERNET)InterlockedExchangePointer((PVOID volatile *)&state->request, NULL);
+                if (request) WinHttpCloseHandle(request);
+                return;
+            }
         }
         if (status == WINHTTP_CALLBACK_STATUS_READ_COMPLETE) {
             InterlockedExchange(&state->received, (LONG)length);
@@ -274,6 +280,12 @@ void xtool_ws_abort(xtool_websocket *state) {
     if (!state) return;
     AcquireSRWLockExclusive(&state->handles_lock);
     InterlockedExchange(&state->closed, 1);
+    if (atomic_read(&state->tls_active)) {
+        // The informational callback closes its request after its final query.
+        // open_request then releases the remaining handles on its error path.
+        ReleaseSRWLockExclusive(&state->handles_lock);
+        return;
+    }
     // Calls that issue asynchronous operations and CloseHandle are serialized.
     // Callbacks never acquire this lock and keep the state alive independently.
     if (state->socket) { WinHttpCloseHandle(state->socket); state->socket = NULL; }
