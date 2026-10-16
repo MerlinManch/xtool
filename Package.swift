@@ -33,6 +33,7 @@ let nativePackages: [Package.Dependency] = [
     .package(path: "Windows/Dependencies/xtool-core"),
     .package(path: "Windows/Dependencies/zsign"),
     .package(path: "Windows/Dependencies/PathKit"),
+    .package(path: "Windows/Dependencies/swift-issue-reporting"),
 ]
 #else
 let nativePackages: [Package.Dependency] = [
