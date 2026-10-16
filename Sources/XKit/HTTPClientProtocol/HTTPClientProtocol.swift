@@ -31,13 +31,16 @@ extension HTTPClientProtocol {
     ) async throws -> (response: HTTPResponse, body: HTTPBody?) {
         let transport = asOpenAPITransport
         let request = request
-        var baseComponents = URLComponents()
-        baseComponents.scheme = request.scheme
-        baseComponents.host = request.authority
+        // Authority includes an optional port (and brackets for IPv6). Assigning
+        // it to URLComponents.host would treat the port as part of the hostname.
+        guard let scheme = request.scheme, let authority = request.authority,
+              let baseURL = URL(string: "\(scheme)://\(authority)") else {
+            throw URLError(.badURL)
+        }
         return try await transport.send(
             request,
             body: body,
-            baseURL: baseComponents.url!,
+            baseURL: baseURL,
             operationID: "dummy"
         )
     }

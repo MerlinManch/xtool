@@ -38,4 +38,16 @@ func windowsFailedWebSocketHandshakeReturnsError() async throws {
         #expect(!(error is CancellationError))
     }
 }
+// No credentials are sent: any HTTP response verifies Foundation's TLS path to
+// the actual Apple authentication/developer endpoints, including their roots.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["XTOOL_HTTP_TEST_URL"] != nil), .timeLimit(.minutes(1)))
+func windowsAppleServiceTLS() async throws {
+    for host in ["gsa.apple.com", "developerservices2.apple.com"] {
+        let url = try #require(URL(string: "https://\(host)/"))
+        let result = try await HTTPClientDependencyKey.liveValue.makeRequest(
+            HTTPRequest(url: url), requireHTTPSuccess: false
+        )
+        #expect((100..<600).contains(result.response.status.code))
+    }
+}
 #endif
