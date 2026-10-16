@@ -92,6 +92,9 @@ private struct Client: HTTPClientProtocol {
     }
 
     public func makeWebSocket(url: URL) async throws -> any WebSocketSession {
+        #if os(Windows)
+        return try await WindowsWebSocket.open(url: url)
+        #else
         let task = session.webSocketTask(with: url)
         let (events, continuation) = AsyncThrowingStream<Void, any Error>.makeStream()
         let delegate = clientDelegate
@@ -116,6 +119,7 @@ private struct Client: HTTPClientProtocol {
             continuation.finish(throwing: CancellationError())
         }
         return WebSocketSessionWrapper(task: task)
+        #endif
     }
 
     enum Errors: Error {

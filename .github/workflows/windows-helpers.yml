@@ -1,7 +1,7 @@
 name: Native Windows helper tests
 on:
   push:
-    paths: ['Windows/native/**', 'Windows/tests/**', 'Windows/build.ps1', 'Windows/vcpkg.json', 'Sources/CWindowsSupport/**', '.github/workflows/windows-helpers.yml']
+    paths: ['Windows/native/**', 'Windows/tests/**', 'Windows/build.ps1', 'Windows/vcpkg.json', 'Sources/CWindowsSupport/**', 'Sources/CWindowsWebSocket/**', 'Windows/websocket-tests/**', '.github/workflows/windows-helpers.yml']
   workflow_dispatch:
 concurrency:
   group: windows-helpers-${{ github.ref }}
@@ -34,6 +34,12 @@ jobs:
         run: |
           ./Windows/build/Release/xtool-test-support.exe
           if ($LASTEXITCODE -ne 0) { throw 'Win32 support tests failed' }
+      - name: Test native WinHTTP WebSockets and cancellation
+        shell: pwsh
+        run: |
+          $env:XTOOL_WINHTTP_TEST_DLL = "$pwd/Windows/build/websocket-tests/Release/xtool-test-websocket.dll"
+          python -m unittest discover -s Windows/websocket-tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Native WinHTTP WebSocket tests failed' }
       - uses: actions/cache/save@v4
         if: always()
         with:

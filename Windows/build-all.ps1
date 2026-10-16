@@ -20,7 +20,8 @@ if (-not $SkipTests) {
     $env:XTOOL_NATIVE_TEST_CHILD = Join-Path $PSScriptRoot 'build/Release/xtool-test-child.exe'
     $env:XTOOL_ANISETTE_DLL = Join-Path $PSScriptRoot 'dist/bin/XADIBinary.dll'
     $env:XTOOL_TEST_APPLE_LIBRARIES = '1'
-    foreach ($directory in @('tests', 'anisette-tests')) {
+    $env:XTOOL_WINHTTP_TEST_DLL = Join-Path $PSScriptRoot 'build/websocket-tests/Release/xtool-test-websocket.dll'
+    foreach ($directory in @('tests', 'anisette-tests', 'websocket-tests')) {
         & python -m unittest discover -s (Join-Path $PSScriptRoot $directory) -v
         if ($LASTEXITCODE -ne 0) { throw "Native $directory failed" }
     }

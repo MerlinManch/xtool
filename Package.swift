@@ -123,6 +123,10 @@ let package = Package(
         ),
         .target(name: "CWindowsADI"),
         .target(
+            name: "CWindowsWebSocket",
+            linkerSettings: [.linkedLibrary("winhttp", .when(platforms: [.windows]))]
+        ),
+        .target(
             name: "CXKit",
             dependencies: [
                 .product(name: "OpenSSL", package: "xtool-core")
@@ -158,6 +162,7 @@ let package = Package(
         .target(
             name: "XKit",
             dependencies: [
+                .target(name: "CWindowsWebSocket", condition: .when(platforms: [.windows])),
                 .target(name: "CWindowsADI", condition: .when(platforms: [.windows])),
                 "DeveloperAPI",
                 "CXKit",
