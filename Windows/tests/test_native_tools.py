@@ -185,7 +185,7 @@ class LinkerTests(unittest.TestCase):
         return subprocess.run([self.root / ('ld64.lld' + SUFFIX), *args], capture_output=True, text=True, encoding='utf-8')
 
     def test_passthrough_and_exit_status(self):
-        args = ['-o', 'space ü/output', '@a response file', 'an object.o']
+        args = ['-o', 'space ü/output', '@a response file', 'an object.o', '', 'embedded "quote"', 'C:\\space path\\', 'backslash\\"quote', 'emoji 🔨']
         result = self.run_linker(args)
         self.assertEqual(result.returncode, 23)
         self.assertEqual(json.loads(result.stdout), args)

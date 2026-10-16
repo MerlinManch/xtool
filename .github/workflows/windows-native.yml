@@ -15,6 +15,15 @@ jobs:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/Windows/binary-cache
     steps:
       - uses: actions/checkout@v4
+      - name: Validate PowerShell scripts
+        shell: pwsh
+        run: |
+          foreach ($script in Get-ChildItem Windows/*.ps1) {
+            $tokens = $null
+            $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors) { throw ($parseErrors | Out-String) }
+          }
       - name: Prepare binary cache
         shell: pwsh
         run: New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
@@ -36,11 +45,13 @@ jobs:
           $env:XTOOL_NATIVE_TEST_CHILD = "$pwd/Windows/build/Release/xtool-test-child.exe"
           python -m unittest discover -s Windows/tests -v
       - name: Test Win32 primitives
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           ./Windows/build/Release/xtool-test-support.exe
           if ($LASTEXITCODE -ne 0) { throw 'Win32 support tests failed' }
       - name: Compile Win32 primitives
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
@@ -50,6 +61,7 @@ jobs:
           cl /nologo /W4 /WX /c /ISources/CWindowsSupport/include Sources/CWindowsSupport/WindowsSupport.c /FoWindows/build/WindowsSupport.obj
           if ($LASTEXITCODE -ne 0) { throw 'Win32 support compilation failed' }
       - name: Build and test complete Swift CLI
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"

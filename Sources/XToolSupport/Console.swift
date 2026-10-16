@@ -37,33 +37,9 @@ enum Console {
         let console = GetStdHandle(STD_INPUT_HANDLE)
         var mode: DWORD = 0
         if GetConsoleMode(console, &mode) != 0 {
-            var units: [UInt16] = []
-            while true {
-                if HostPlatform.interrupted { throw CancellationError() }
-                var buffer = [UInt16](repeating: 0, count: 1024)
-                var count: DWORD = 0
-                guard ReadConsoleW(console, &buffer, 1024, &count, nil) != 0 else {
-                    if HostPlatform.interrupted { throw CancellationError() }
-                    throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()))
-                }
-                if count == 0 { break }
-                let chunk = buffer.prefix(Int(count))
-                if let newline = chunk.firstIndex(of: 10) {
-                    units.append(contentsOf: chunk[..<newline])
-                    break
-                }
-                units.append(contentsOf: chunk)
-            }
-            if units.last == 13 { units.removeLast() }
-            return String(decoding: units, as: UTF16.self)
+            return try readWindowsConsoleLine()
         }
-        var data = Data()
-        while let byte = try FileHandle.standardInput.read(upToCount: 1), !byte.isEmpty {
-            if byte[0] == 10 { break }
-            data.append(byte)
-        }
-        if data.last == 13 { data.removeLast() }
-        return String(decoding: data, as: UTF8.self)
+        return try readRedirectedLine()
         #else
         try await withStdio { stdin, stdout in
             try await stdout.write(ByteBuffer(bytes: message.utf8))
@@ -85,6 +61,41 @@ enum Console {
         }
         #endif
     }
+
+    #if os(Windows)
+    private static func readWindowsConsoleLine() throws -> String {
+        let console = GetStdHandle(STD_INPUT_HANDLE)
+        var units: [UInt16] = []
+        while true {
+            if HostPlatform.interrupted { throw CancellationError() }
+            var buffer = [UInt16](repeating: 0, count: 1024)
+            var count: DWORD = 0
+            guard ReadConsoleW(console, &buffer, 1024, &count, nil) != 0 else {
+                if HostPlatform.interrupted { throw CancellationError() }
+                throw NSError(domain: NSOSStatusErrorDomain, code: Int(GetLastError()))
+            }
+            if count == 0 { break }
+            let chunk = buffer.prefix(Int(count))
+            if let newline = chunk.firstIndex(of: 10) {
+                units.append(contentsOf: chunk[..<newline])
+                break
+            }
+            units.append(contentsOf: chunk)
+        }
+        if units.last == 13 { units.removeLast() }
+        return String(decoding: units, as: UTF16.self)
+    }
+
+    private static func readRedirectedLine() throws -> String {
+        var data = Data()
+        while let byte = try FileHandle.standardInput.read(upToCount: 1), !byte.isEmpty {
+            if byte[0] == 10 { break }
+            data.append(byte)
+        }
+        if data.last == 13 { data.removeLast() }
+        return String(decoding: data, as: UTF8.self)
+    }
+    #endif
 
     static func promptRequired(_ message: String, existing: String?) async throws -> String {
         let value: String

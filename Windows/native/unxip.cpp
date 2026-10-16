@@ -123,6 +123,8 @@ static int extract(const fs::path& input, const fs::path& output) {
     PBZXReader stream(xar.get());
     Reader cpio(archive_read_new());
     check(archive_read_support_format_cpio(cpio.get()), cpio.get());
+    // Xcode CPIO stores UTF-8 filenames regardless of the host ANSI code page.
+    check(archive_read_set_format_option(cpio.get(), "cpio", "hdrcharset", "UTF-8"), cpio.get());
     check(archive_read_open(cpio.get(), &stream, nullptr,
         [](archive* reader, void* context, const void** buffer) -> la_ssize_t {
             return static_cast<PBZXReader*>(context)->next(reader, buffer);

@@ -9,7 +9,7 @@ enum XToolMain {
     static func main() async throws {
         prepareDependencies { _ in
             // TODO: Improve persistence mechanism
-            // for Windows, we could use dpapi.h or wincred.h.
+            // Windows credentials use DPAPI via WindowsProtectedStorage.
             // for Linux, maybe use libsecret?
             // see https://github.com/atom/node-keytar
         }

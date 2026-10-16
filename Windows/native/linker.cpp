@@ -120,15 +120,49 @@ static std::vector<String> expandResponse(const std::vector<String>& args, unsig
     return expanded;
 }
 
+#ifdef _WIN32
+// CreateProcess receives a single command line. Quote every argument using the
+// MSVC CRT grammar; _wspawnv joins arguments without preserving their boundaries.
+static String quoteArgument(const String& argument) {
+    String result = L"\"";
+    size_t slashes = 0;
+    for (wchar_t character : argument) {
+        if (character == L'\\') { ++slashes; continue; }
+        if (character == L'"') {
+            result.append(slashes * 2 + 1, L'\\');
+        } else {
+            result.append(slashes, L'\\');
+        }
+        slashes = 0;
+        result += character;
+    }
+    result.append(slashes * 2, L'\\');
+    result += L'"';
+    return result;
+}
+#endif
+
 static int run(const fs::path& executable, const std::vector<String>& args) {
     auto name = executable.native();
+#ifdef _WIN32
+    String commandLine = quoteArgument(name);
+    for (const auto& arg : args) commandLine += L" " + quoteArgument(arg);
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION process{};
+    if (!CreateProcessW(name.c_str(), commandLine.data(), nullptr, nullptr, TRUE,
+                        0, nullptr, nullptr, &startup, &process)) return 127;
+    CloseHandle(process.hThread);
+    DWORD code = 127;
+    if (WaitForSingleObject(process.hProcess, INFINITE) == WAIT_OBJECT_0) {
+        if (!GetExitCodeProcess(process.hProcess, &code)) code = 127;
+    }
+    CloseHandle(process.hProcess);
+    return static_cast<int>(code);
+#else
     std::vector<const String::value_type*> argv = {name.c_str()};
     for (const auto& arg : args) argv.push_back(arg.c_str());
     argv.push_back(nullptr);
-#ifdef _WIN32
-    auto result = _wspawnv(_P_WAIT, name.c_str(), argv.data());
-    return result == -1 ? 127 : static_cast<int>(result);
-#else
     execv(name.c_str(), const_cast<char* const*>(argv.data()));
     return 127;
 #endif
